@@ -1,0 +1,18 @@
+{
+  "repository": "https://github.com/vv19/instant_policy",
+  "commit": "72281736672a555e9c9834eb15c225e2f1baaf93",
+  "distribution": "public deployment binary and examples",
+  "files": {
+    "LICENSE": "b61890a7cc076d060be71343c3cff149996aa613ce8ba4d70ea9108af5b3164f",
+    "README.md": "cf130ce650d83de31da0d6d9c4f4ef89fc3579019fc459575223a7dbaa85e480",
+    "download_weights.sh": "0f06ad17275da467c4a29b982d2e4e884a3426c1751c01d66d13bd7c1f60f022",
+    "environment.yml": "6d22dbf48e505d7e81ae4943e7f85087304d3ce4f8ce3faf056313a93c5c78f1",
+    "instant_policy.pyi": "70c9be0ac1c123fb1cfb4b9875d6c97b44b937153e363554b36a8a7fcde57e39",
+    "instant_policy.so": "ef65547a8cce3699dbea7917a64dbee443a812f0e949bec9ef545c7974bcecc7",
+    "utils.py": "c6b0c0a59f4c17d3767a47003a18ceca5cd33a68c8ca5533b6256008bdfbab31",
+    "sim_utils.py": "d0ec9b12db2a606eac88f044a82e0e9e1d9345dcba3b42bc2a312b0dce11a299",
+    "deploy.py": "b3260df160172b4ca5f2209bfbe4ec87491b6a50e64848234d6a95977d31fab1",
+    "deploy_sim.py": "f9953f1b4df2367d8958e3b146404247e76ef07d82aa80a6107336c973c089bd",
+    "media/rollout_roll.gif": "63665e401b9164a548cfbb90fcd1934e167c74c4c00531dd626f3101e10baade"
+  }
+}

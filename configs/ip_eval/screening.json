@@ -1,0 +1,9 @@
+{
+  "protocol": "screening",
+  "num_demos": 1,
+  "num_demo_iter": 5,
+  "num_rollouts": 2,
+  "demo_seed": 100000000,
+  "rollout_seed": 200000000,
+  "headless": true
+}

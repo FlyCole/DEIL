@@ -1,0 +1,159 @@
+{
+  "schema_version": 1,
+  "default_source_root": ".depth_dependencies",
+  "baseline_names": [
+    "gt",
+    "pi3",
+    "vggt",
+    "moge",
+    "mast3r",
+    "map_anything"
+  ],
+  "variant_aliases": {
+    "map_anything_no_ext": "map_anything"
+  },
+  "dependencies": {
+    "pi3": {
+      "repository": "https://github.com/yyfz/Pi3.git",
+      "commit": "0a505af9c261a7c8e44946fba5b1942cdc25914b",
+      "directory": "Pi3",
+      "legacy_directories": [
+        "Pi3"
+      ],
+      "import_marker": "pi3/models/pi3.py",
+      "patches": [
+        {
+          "path": "patches/depth_dependencies/pi3-quiet-image-loading.patch",
+          "sha256": "4596f5ca602f846daecbfec4eedfab44bbf7316bcc97faea6079040cd856d380",
+          "files": {
+            "pi3/utils/basic.py": "2051ed5ada0f5cd4b378d24e7f308a8283cd7c13a4f3d87dbafa7823c2aeba25"
+          }
+        },
+        {
+          "path": "patches/depth_dependencies/pi3-torch22-sdpa.patch",
+          "sha256": "18b678427f6610576f51e8c15f9a51cf6456038ed4e3b909c76e2e7585d47c8c",
+          "files": {
+            "pi3/models/layers/attention.py": "da60e6efd2247c9668817cbb4fd135e3069478fb2f94ee15a3627ced82ac110a"
+          }
+        }
+      ],
+      "install": {
+        "requirements": [
+          "requirements.txt"
+        ],
+        "editable": false
+      },
+      "audit": {
+        "existing_source_changes": "Three loading progress prints disabled.",
+        "new_compatibility_patch": "Use the existing torch.nn.attention SDPA context on Torch >=2.3; on Torch 2.2 map the identical flash/math/memory-efficient backend flags through torch.backends.cuda.sdp_kernel. Four context call targets change; qkv and attention mathematical operations do not change.",
+        "validation_boundary": "CPU comparison on the existing newer Torch and simulated Torch 2.2 import/flag branch; actual Torch 2.2 GPU inference is not verified.",
+        "torch22_primary_sources": [
+          "https://raw.githubusercontent.com/pytorch/pytorch/v2.2.0/torch/backends/cuda/__init__.py",
+          "https://raw.githubusercontent.com/pytorch/pytorch/v2.2.0/torch/amp/__init__.py",
+          "https://raw.githubusercontent.com/pytorch/pytorch/v2.3.0/torch/nn/attention/__init__.py"
+        ]
+      }
+    },
+    "vggt": {
+      "repository": "https://github.com/facebookresearch/vggt.git",
+      "commit": "692096e8184112793170cd9b124bdc6ba30149cb",
+      "directory": "vggt",
+      "legacy_directories": [],
+      "import_marker": "vggt/models/vggt.py",
+      "patches": [
+        {
+          "path": "patches/depth_dependencies/vggt-package-discovery.patch",
+          "sha256": "f6192978560e9073063aca36fa9f37e39b4e2e22babbac87eb92f535c2491ae5",
+          "files": {
+            "pyproject.toml": "e055e0eecda37dc33c0841bce8192c4ec0d4fb1a4663e397f7c4b3e037239ff7"
+          }
+        }
+      ],
+      "install": {
+        "requirements": [],
+        "editable": true
+      },
+      "audit": {
+        "runtime_python_files_compared": 27,
+        "runtime_logic_changes": [],
+        "legacy_import_prefix_changes": [
+          "vggt/heads/camera_head.py",
+          "vggt/models/aggregator.py",
+          "vggt/models/vggt.py"
+        ],
+        "preserved_patch": "Relax numpy to <2 and include all vggt subpackages in package discovery. The legacy vggt.vggt prefix is replaced by canonical upstream imports."
+      }
+    },
+    "moge": {
+      "repository": "https://github.com/microsoft/MoGe.git",
+      "commit": "07444410f1e33f402353b99d6ccd26bd31e469e8",
+      "directory": "MoGe",
+      "legacy_directories": [
+        "MoGe"
+      ],
+      "import_marker": "moge/model/v2.py",
+      "patches": [],
+      "install": {
+        "requirements": [],
+        "editable": true
+      },
+      "audit": "Clean checkout matching origin/main; no project source patch.",
+      "auxiliary_git_dependencies": {
+        "utils3d": "https://github.com/EasternJournalist/utils3d.git@3fab839f0be9931dac7c8488eb0e1600c236e183",
+        "pipeline": "https://github.com/EasternJournalist/pipeline.git@866f059d2a05cde05e4a52211ec5051fd5f276d6"
+      }
+    },
+    "mast3r": {
+      "repository": "https://github.com/naver/mast3r.git",
+      "commit": "f5209afc300cec36239a7ac992263f36847bbba0",
+      "directory": "mast3r_root",
+      "legacy_directories": [
+        "mast3r_root",
+        "mast3r"
+      ],
+      "import_marker": "mast3r/model.py",
+      "patches": [],
+      "submodules": [
+        {
+          "path": "dust3r",
+          "commit": "3cc8c88c413bb9e34c41db0e0eef99c2ee010b12",
+          "submodules": [
+            {
+              "path": "croco",
+              "commit": "d7de0705845239092414480bd829228723bf20de"
+            }
+          ]
+        }
+      ],
+      "install": {
+        "requirements": [
+          "requirements.txt",
+          "dust3r/requirements.txt"
+        ],
+        "editable": false
+      },
+      "cuda_extension": "dust3r/croco/models/curope",
+      "audit": "MASt3R, DUSt3R and CroCo tracked source is clean. Local CroCo build/cache is generated. Optional ASMK at 2a96d9c03a841dffdfddabc699a20512dcd09363 only has regenerated Cython hamming.c and is not used by the complete scene graph."
+    },
+    "map_anything": {
+      "repository": "https://github.com/facebookresearch/map-anything.git",
+      "commit": "f065d13383ae84a7f80f0e0104a4d12afc7c7c82",
+      "directory": "map-anything",
+      "legacy_directories": [
+        "map-anything"
+      ],
+      "import_marker": "mapanything/models/__init__.py",
+      "patches": [],
+      "install": {
+        "requirements": [],
+        "editable": true
+      },
+      "audit": "Clean checkout matching origin/main; shared by known-pose and no-extrinsics variants."
+    }
+  },
+  "installation_policy": {
+    "torch_stack": "Constrain installed torch/torchvision and torchaudio when present; do not upgrade them implicitly",
+    "numpy": "<2",
+    "verified_scope": "Source fetch and CPU interface tests; no fresh environment install or GPU experiment validation"
+  }
+}

@@ -1,0 +1,5221 @@
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/common/replay_buffer.py b/3D-Diffusion-Policy/diffusion_policy_3d/common/replay_buffer.py
+index d1181181f1fde7ce6ed8e35c726cf1030690626f..3ae27fc0c1c8eb66714af9e4fb1bfc3cc626dde0 100644
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/common/replay_buffer.py
++++ b/3D-Diffusion-Policy/diffusion_policy_3d/common/replay_buffer.py
+@@ -375,8 +375,6 @@ class ReplayBuffer:
+         return self.meta['episode_ends']
+     
+     def get_episode_idxs(self):
+-        import numba
+-        numba.jit(nopython=True)
+         def _get_episode_idxs(episode_ends):
+             result = np.zeros((episode_ends[-1],), dtype=np.int64)
+             for i in range(len(episode_ends)):
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/common/sampler.py b/3D-Diffusion-Policy/diffusion_policy_3d/common/sampler.py
+index e4697c177cd704a38f0539df791c56d0cd7b947a..2c25a83836c9710575842a39f254efee46739adc 100644
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/common/sampler.py
++++ b/3D-Diffusion-Policy/diffusion_policy_3d/common/sampler.py
+@@ -1,10 +1,8 @@
+ from typing import Optional
+ import numpy as np
+-import numba
+ from diffusion_policy_3d.common.replay_buffer import ReplayBuffer
+ 
+ 
+-@numba.jit(nopython=True)
+ def create_indices(
+     episode_ends:np.ndarray, sequence_length:int, 
+     episode_mask: np.ndarray,
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/dp3.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/dp3.yaml
+index 411fd60cfc9516f52c09b9812432c63a557f3419..4c6515955b08f2cb0fb13b3d58f8ba0cb180fddf 100644
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/dp3.yaml
++++ b/3D-Diffusion-Policy/diffusion_policy_3d/config/dp3.yaml
+@@ -3,15 +3,15 @@ defaults:
+ 
+ name: train_dp3
+ 
+-task_name: ${task.name}
++task_name: ${task.task_name}
+ shape_meta: ${task.shape_meta}
+ exp_name: "debug"
+ 
+-# horizon: 4
+-horizon: 16
++horizon: 4
++# horizon: 16
+ n_obs_steps: 2
+-# n_action_steps: 3
+-n_action_steps: 8
++n_action_steps: 3
++# n_action_steps: 8
+ n_latency_steps: 0
+ dataset_obs_steps: ${n_obs_steps}
+ keypoint_visible_rate: 1.0
+@@ -100,15 +100,16 @@ optimizer:
+ training:
+   device: "cuda:0"
+   seed: 42
++  eval_seed: 100000  # Episode i uses eval_seed + i.
+   debug: False
+   resume: True
+   lr_scheduler: cosine
+   lr_warmup_steps: 500
+-  num_epochs: 3000
++  num_epochs: 150
+   gradient_accumulate_every: 1
+   use_ema: True
+-  rollout_every: 200
+-  checkpoint_every: 200
++  rollout_every: 20
++  checkpoint_every: 20
+   val_every: 1
+   sample_every: 5
+   max_train_steps: null
+@@ -136,14 +137,14 @@ checkpoint:
+   save_last_snapshot: False
+ 
+ multi_run:
+-  run_dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
++  run_dir: 3D-Diffusion-Policy/data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
+   wandb_name_base: ${now:%Y.%m.%d-%H.%M.%S}_${name}_${task_name}
+ 
+ hydra:
+   job:
+     override_dirname: ${name}
+   run:
+-    dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
++    dir: 3D-Diffusion-Policy/data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
+   sweep:
+-    dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
++    dir: 3D-Diffusion-Policy/data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
+     subdir: ${hydra.job.num}
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/simple_dp3.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/simple_dp3.yaml
+index fd352f4486cf6256da8429fe13ba53bb34fbc7db..b813cfaa32d368fcc28453a92613628983b1afa8 100644
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/simple_dp3.yaml
++++ b/3D-Diffusion-Policy/diffusion_policy_3d/config/simple_dp3.yaml
+@@ -105,6 +105,7 @@ optimizer:
+ training:
+   device: "cuda:0"
+   seed: 42
++  eval_seed: 100000  # Episode i uses eval_seed + i.
+   debug: False
+   resume: True
+   lr_scheduler: cosine
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/adroit_door.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/adroit_door.yaml
+deleted file mode 100644
+index 2ca0cbb1eb5b44a0628eb638cb8fb197523b2b8b..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/adroit_door.yaml
++++ /dev/null
+@@ -1,36 +0,0 @@
+-name: adroit_door
+-
+-task_name: door
+-
+-shape_meta: &shape_meta
+-  # acceptable types: rgb, low_dim
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [24]
+-      type: low_dim
+-  action:
+-    shape: [28]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.adroit_runner.AdroitRunner
+-  eval_episodes: 20
+-  max_steps: 300
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  task_name: door
+-  render_size: 84
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.adroit_dataset.AdroitDataset
+-  zarr_path: data/adroit_door_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/adroit_hammer.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/adroit_hammer.yaml
+deleted file mode 100644
+index 416d795c85c23e8140fef3b329fe298b4f364d02..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/adroit_hammer.yaml
++++ /dev/null
+@@ -1,40 +0,0 @@
+-name: adroit_hammer
+-
+-task_name: hammer
+-
+-image_shape: &image_shape [3, 84, 84]
+-shape_meta: &shape_meta
+-  # acceptable types: rgb, low_dim
+-  obs:
+-    # image:
+-    #     shape: *image_shape
+-    #     type: rgb
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [24]
+-      type: low_dim
+-  action:
+-    shape: [26]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.adroit_runner.AdroitRunner
+-  eval_episodes: 20
+-  max_steps: 300
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  task_name: hammer
+-  render_size: 84
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.adroit_dataset.AdroitDataset
+-  zarr_path: data/adroit_hammer_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/adroit_pen.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/adroit_pen.yaml
+deleted file mode 100644
+index 3d2d8743de2142f31be65a513cb63fcb4ebf2d11..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/adroit_pen.yaml
++++ /dev/null
+@@ -1,40 +0,0 @@
+-name: adroit_pen
+-
+-task_name: pen
+-
+-image_shape: &image_shape [3, 84, 84]
+-shape_meta: &shape_meta
+-  # acceptable types: rgb, low_dim
+-  obs:
+-    # image:
+-    #     shape: *image_shape
+-    #     type: rgb
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [24]
+-      type: low_dim
+-  action:
+-    shape: [24]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.adroit_runner.AdroitRunner
+-  eval_episodes: 20
+-  max_steps: 300
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  task_name: pen
+-  render_size: 84
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.adroit_dataset.AdroitDataset
+-  zarr_path: data/adroit_pen_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/dexart_bucket.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/dexart_bucket.yaml
+deleted file mode 100644
+index 81acdf6b771dbccc988965a9f0f02a9c186539b8..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/dexart_bucket.yaml
++++ /dev/null
+@@ -1,40 +0,0 @@
+-name: dexart_bucket
+-
+-task_name: bucket
+-
+-shape_meta: &shape_meta
+-  # acceptable types: rgb, low_dim
+-  obs:
+-    point_cloud:
+-      shape: [1024, 3]
+-      type: point_cloud
+-    imagin_robot:
+-      shape: [96, 7]
+-      type: point_cloud
+-    image:
+-        shape: [3, 84, 84]
+-        type: rgb
+-    agent_pos:
+-      shape: [33]
+-      type: low_dim
+-  action:
+-    shape: [22]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.dexart_runner.DexArtRunner
+-  n_train: 20
+-  max_steps: 50
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  task_name: bucket
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.dexart_dataset.DexArtDataset
+-  zarr_path: data/dexart_bucket_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/dexart_faucet.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/dexart_faucet.yaml
+deleted file mode 100644
+index ee60480aca7a13a75e4165a2759b89605e4dc1d9..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/dexart_faucet.yaml
++++ /dev/null
+@@ -1,40 +0,0 @@
+-name: dexart_faucet
+-
+-task_name: faucet
+-
+-shape_meta: &shape_meta
+-  # acceptable types: rgb, low_dim
+-  obs:
+-    point_cloud:
+-      shape: [1024, 3]
+-      type: point_cloud
+-    imagin_robot:
+-      shape: [96, 7]
+-      type: point_cloud
+-    image:
+-        shape: [3, 84, 84]
+-        type: rgb
+-    agent_pos:
+-      shape: [32]
+-      type: low_dim
+-  action:
+-    shape: [22]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.dexart_runner.DexArtRunner
+-  n_train: 20
+-  max_steps: 50
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  task_name: faucet
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.dexart_dataset.DexArtDataset
+-  zarr_path: data/dexart_faucet_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/dexart_laptop.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/dexart_laptop.yaml
+deleted file mode 100644
+index 80be4dc484f5d59bab90011332935e84c09be156..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/dexart_laptop.yaml
++++ /dev/null
+@@ -1,40 +0,0 @@
+-name: dexart_laptop
+-
+-task_name: laptop
+-
+-shape_meta: &shape_meta
+-  # acceptable types: rgb, low_dim
+-  obs:
+-    point_cloud:
+-      shape: [1024, 3]
+-      type: point_cloud
+-    imagin_robot:
+-      shape: [96, 7]
+-      type: point_cloud
+-    image:
+-        shape: [3, 84, 84]
+-        type: rgb
+-    agent_pos:
+-      shape: [32]
+-      type: low_dim
+-  action:
+-    shape: [22]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.dexart_runner.DexArtRunner
+-  n_train: 20
+-  max_steps: 50
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  task_name: laptop
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.dexart_dataset.DexArtDataset
+-  zarr_path: data/dexart_laptop_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/dexart_toilet.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/dexart_toilet.yaml
+deleted file mode 100644
+index 7a05849ee3971e2f0e618e552b5a6fede199059d..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/dexart_toilet.yaml
++++ /dev/null
+@@ -1,40 +0,0 @@
+-name: dexart_toilet
+-
+-task_name: toilet
+-
+-shape_meta: &shape_meta
+-  # acceptable types: rgb, low_dim
+-  obs:
+-    point_cloud:
+-      shape: [1024, 3]
+-      type: point_cloud
+-    imagin_robot:
+-      shape: [96, 7]
+-      type: point_cloud
+-    image:
+-        shape: [3, 84, 84]
+-        type: rgb
+-    agent_pos:
+-      shape: [32]
+-      type: low_dim
+-  action:
+-    shape: [22]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.dexart_runner.DexArtRunner
+-  n_train: 20
+-  max_steps: 50
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  task_name: toilet
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.dexart_dataset.DexArtDataset
+-  zarr_path: data/dexart_toilet_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_assembly.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_assembly.yaml
+deleted file mode 100644
+index e3e994495bd3b5ea7489b58c63fdb1530aa4e747..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_assembly.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: assembly
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_assembly_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_basketball.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_basketball.yaml
+deleted file mode 100644
+index 9ddfb161c7faed4cfebdf69ca2f5a10bca53d3bb..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_basketball.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: basketball
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_basketball_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_bin-picking.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_bin-picking.yaml
+deleted file mode 100644
+index 6ebfe33293c2b80b1767bff9098ddec9e74f38fd..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_bin-picking.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: bin-picking
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_bin-picking_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_box-close.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_box-close.yaml
+deleted file mode 100644
+index 4807967bf4ac4365c82e643c7efe340b42b5d389..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_box-close.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: box-close
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_box-close_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_button-press-topdown-wall.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_button-press-topdown-wall.yaml
+deleted file mode 100644
+index 1c2bdcaef551f5f733477e3ceea2e46f9a7f2c16..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_button-press-topdown-wall.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: button-press-topdown-wall
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_button-press-topdown-wall_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_button-press-topdown.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_button-press-topdown.yaml
+deleted file mode 100644
+index 38fd77e28c6b61c7c0453c2aada2e57f58146512..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_button-press-topdown.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: button-press-topdown
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_button-press-topdown_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_button-press-wall.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_button-press-wall.yaml
+deleted file mode 100644
+index 44d13338f0f610ae85545e2cad0cea956ee709a9..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_button-press-wall.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: button-press-wall
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_button-press-wall_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_button-press.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_button-press.yaml
+deleted file mode 100644
+index 507835c6a537e0796312ea97646300190109485b..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_button-press.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: button-press
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_button-press_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_coffee-button.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_coffee-button.yaml
+deleted file mode 100644
+index 41d12a2cfe8f604ca39b2ce11ab174112630044f..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_coffee-button.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: coffee-button
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_coffee-button_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_coffee-pull.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_coffee-pull.yaml
+deleted file mode 100644
+index 8136d1276e92314ca63b7d883514bb47b7a18de2..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_coffee-pull.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: coffee-pull
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_coffee-pull_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_coffee-push.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_coffee-push.yaml
+deleted file mode 100644
+index d15d7e87c907ec07d3e7795f95d0048cd4266a43..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_coffee-push.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: coffee-push
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_coffee-push_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_dial-turn.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_dial-turn.yaml
+deleted file mode 100644
+index cb138fcc43ea080a4dc989f5722170914ed7a0b7..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_dial-turn.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: dial-turn
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_dial-turn_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_disassemble.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_disassemble.yaml
+deleted file mode 100644
+index 1535bf35a14c9cb4a47553ad35bd95e36b223131..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_disassemble.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: disassemble
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_disassemble_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_door-close.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_door-close.yaml
+deleted file mode 100644
+index 76b7b1e83f0dc95b9ceac25a1172b7a1099edc9e..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_door-close.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: door-close
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_door-close_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_door-lock.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_door-lock.yaml
+deleted file mode 100644
+index 4c061eb2d6d505a99c23bf39123ca103a5605b64..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_door-lock.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: door-lock
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_door-lock_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_door-open.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_door-open.yaml
+deleted file mode 100644
+index d77a01dde601c8c2b4ee4105be9926753540b837..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_door-open.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: door-open
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_door-open_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_door-unlock.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_door-unlock.yaml
+deleted file mode 100644
+index d1be57c44ed29516a7f9c06fb8bdd43065b88cd2..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_door-unlock.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: door-unlock
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_door-unlock_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_drawer-close.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_drawer-close.yaml
+deleted file mode 100644
+index 8557e53833b7d625fe81fcbcca0b0dc026244fdc..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_drawer-close.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: drawer-close
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_drawer-close_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_drawer-open.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_drawer-open.yaml
+deleted file mode 100644
+index c73541366d0fba64dd0ff8e290ae9d592a2e3e58..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_drawer-open.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: drawer-open
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_drawer-open_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_faucet-close.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_faucet-close.yaml
+deleted file mode 100644
+index e4e27ac677d1bf61c43d4876336ef4e64a17792f..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_faucet-close.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: faucet-close
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_faucet-close_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_faucet-open.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_faucet-open.yaml
+deleted file mode 100644
+index f5995136be15b4cdb8bd8f5a922824ec95878778..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_faucet-open.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: faucet-open
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_faucet-open_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_hammer.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_hammer.yaml
+deleted file mode 100644
+index cb7331e6bfa6a9fff97db6401b98abf079b74e20..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_hammer.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: hammer
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_hammer_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_hand-insert.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_hand-insert.yaml
+deleted file mode 100644
+index 99d61ff623c811569ff72e49ddfad61cfc24d368..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_hand-insert.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: hand-insert
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_hand-insert_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_handle-press-side.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_handle-press-side.yaml
+deleted file mode 100644
+index d701241e6cc35e3fb8bc6d0ea46bd4e0d6850311..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_handle-press-side.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: handle-press-side
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_handle-press-side_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_handle-press.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_handle-press.yaml
+deleted file mode 100644
+index 8dc20ee200a15cf58b2104341fcb1a9c63bac298..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_handle-press.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: handle-press
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_handle-press_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_handle-pull-side.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_handle-pull-side.yaml
+deleted file mode 100644
+index eacc247ac30f9ab70539079ab624536d15534a57..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_handle-pull-side.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: handle-pull-side
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_handle-pull-side_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_handle-pull.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_handle-pull.yaml
+deleted file mode 100644
+index 4ac1e64e727784ee4fb2568e5a908a7f525c67a5..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_handle-pull.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: handle-pull
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_handle-pull_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_lever-pull.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_lever-pull.yaml
+deleted file mode 100644
+index af7cc45ed3080c8ad44adbe3f242e911e4a358d3..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_lever-pull.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: lever-pull
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_lever-pull_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_peg-insert-side.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_peg-insert-side.yaml
+deleted file mode 100644
+index 8b4c7a156fe5bf1ee8ebb25a7ae7a7e6f7b8489d..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_peg-insert-side.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: peg-insert-side
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_peg-insert-side_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_peg-unplug-side.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_peg-unplug-side.yaml
+deleted file mode 100644
+index 31f10376d7c1d369f8c2b6678864be50b0094c62..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_peg-unplug-side.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: peg-unplug-side
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_peg-unplug-side_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_pick-out-of-hole.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_pick-out-of-hole.yaml
+deleted file mode 100644
+index ec50ec735ed2dd03786420cf48e8c81b7cff8829..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_pick-out-of-hole.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: pick-out-of-hole
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_pick-out-of-hole_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_pick-place-wall.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_pick-place-wall.yaml
+deleted file mode 100644
+index 6eb53de1197d4dafcafa88d9fb12190fdc660063..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_pick-place-wall.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: pick-place-wall
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_pick-place-wall_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_pick-place.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_pick-place.yaml
+deleted file mode 100644
+index 8643c1b4153d85c3005d14da721a05645c9a8cb9..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_pick-place.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: pick-place
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_pick-place_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_plate-slide-back-side.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_plate-slide-back-side.yaml
+deleted file mode 100644
+index a82acf3ca72d56798142d85a98948ca50625a2de..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_plate-slide-back-side.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: plate-slide-back-side
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_plate-slide-back-side_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_plate-slide-back.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_plate-slide-back.yaml
+deleted file mode 100644
+index 0c5fdcd14c8cf4136a66ec4b0804f4e83a49483c..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_plate-slide-back.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: plate-slide-back
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_plate-slide-back_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_plate-slide-side.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_plate-slide-side.yaml
+deleted file mode 100644
+index 5c76578742dd97a5a70a063529a259a8286c4dd8..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_plate-slide-side.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: plate-slide-side
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_plate-slide-side_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_plate-slide.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_plate-slide.yaml
+deleted file mode 100644
+index df26ce80326a6a03a00b54916f0e42d750e5f437..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_plate-slide.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: plate-slide
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_plate-slide_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_push-back.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_push-back.yaml
+deleted file mode 100644
+index 2cd70935211aa735d61c9a34f6085510e149e1f3..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_push-back.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: push-back
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_push-back_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_push-wall.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_push-wall.yaml
+deleted file mode 100644
+index b3729368a876277517aa01a52e6c3b4bbd68e269..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_push-wall.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: push-wall
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_push-wall_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_push.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_push.yaml
+deleted file mode 100644
+index fae586915f5c86693029549cdad6a8b4c26c0cd7..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_push.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: push
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_push_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_reach-wall.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_reach-wall.yaml
+deleted file mode 100644
+index 15d52aa71f148e43e935c0890e9b717b7b4fbbcf..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_reach-wall.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: reach-wall
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_reach-wall_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_reach.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_reach.yaml
+deleted file mode 100644
+index 8442c98e35aa081a187ef2ef3b464780b6ad78f9..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_reach.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: reach
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_reach_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_shelf-place.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_shelf-place.yaml
+deleted file mode 100644
+index d1dfb24a6df39e390eb967f632737503a0c5dccb..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_shelf-place.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: shelf-place
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_shelf-place_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_soccer.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_soccer.yaml
+deleted file mode 100644
+index 855f8e22c5196db75b1e0b732795e554c8620f92..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_soccer.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: soccer
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_soccer_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_stick-pull.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_stick-pull.yaml
+deleted file mode 100644
+index 6eb763db7fb51fed7cd8d155b48622bf7ffc989e..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_stick-pull.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: stick-pull
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_stick-pull_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_stick-push.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_stick-push.yaml
+deleted file mode 100644
+index c4df39d432a35cf0a879d1dcdbc25505f13d7ec6..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_stick-push.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: stick-push
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_stick-push_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_sweep-into.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_sweep-into.yaml
+deleted file mode 100644
+index bd2c1e9ca652776fc77dabb2be53f839c7e50b08..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_sweep-into.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: sweep-into
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_sweep-into_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_sweep.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_sweep.yaml
+deleted file mode 100644
+index 6d7a38b3217cf23f97695bc04dd5af6a76bd1e7a..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_sweep.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: sweep
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_sweep_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_window-close.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_window-close.yaml
+deleted file mode 100644
+index c7868bb490c2c4c2455861c2160b9b2df6eff85d..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_window-close.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: window-close
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_window-close_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_window-open.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_window-open.yaml
+deleted file mode 100644
+index 0c03694dd7236582574797f4c5d56629f31220b0..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/metaworld_window-open.yaml
++++ /dev/null
+@@ -1,37 +0,0 @@
+-name: window-open
+-
+-task_name: ${name}
+-
+-shape_meta: &shape_meta
+-  obs:
+-    point_cloud:
+-      shape: [512, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [9]
+-      type: low_dim
+-  action:
+-    shape: [4]
+-
+-env_runner:
+-  _target_: diffusion_policy_3d.env_runner.metaworld_runner.MetaworldRunner
+-  eval_episodes: 20
+-  n_obs_steps: ${n_obs_steps}
+-  n_action_steps: ${n_action_steps}
+-  fps: 10
+-  n_envs: null
+-  n_train: null
+-  n_test: null
+-  task_name: ${task_name}
+-  device: ${training.device}
+-  use_point_crop: ${policy.use_point_crop}
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.metaworld_dataset.MetaworldDataset
+-  zarr_path: data/metaworld_window-open_expert.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/realdex_drill.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/realdex_drill.yaml
+deleted file mode 100644
+index 911dd5bc7e45e8cf2ac98281ee62c792a549fd38..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/realdex_drill.yaml
++++ /dev/null
+@@ -1,27 +0,0 @@
+-name: realdex_drill
+-
+-task_name: drill
+-
+-shape_meta: &shape_meta
+-  # acceptable types: rgb, low_dim
+-  obs:
+-    point_cloud:
+-      shape: [1024, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [22]
+-      type: low_dimx
+-  action:
+-    shape: [22]
+-
+-env_runner: null
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.realdex_dataset.RealDexDataset
+-  zarr_path: data/realdex_drill.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/realdex_dumpling.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/realdex_dumpling.yaml
+deleted file mode 100644
+index b530f58ae8bbe8935a0f390cb346795b27d04fc4..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/realdex_dumpling.yaml
++++ /dev/null
+@@ -1,27 +0,0 @@
+-name: realdex_dumpling
+-
+-task_name: dumpling
+-
+-shape_meta: &shape_meta
+-  # acceptable types: rgb, low_dim
+-  obs:
+-    point_cloud:
+-      shape: [1024, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [22]
+-      type: low_dimx
+-  action:
+-    shape: [22]
+-
+-env_runner: null
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.realdex_dataset.RealDexDataset
+-  zarr_path: data/realdex_dumpling.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/realdex_pour.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/realdex_pour.yaml
+deleted file mode 100644
+index ea674071f3e45efa4b001ba1ce47290d266c9e2e..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/realdex_pour.yaml
++++ /dev/null
+@@ -1,27 +0,0 @@
+-name: realdex_pour
+-
+-task_name: pour
+-
+-shape_meta: &shape_meta
+-  # acceptable types: rgb, low_dim
+-  obs:
+-    point_cloud:
+-      shape: [1024, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [7]
+-      type: low_dimx
+-  action:
+-    shape: [7]
+-
+-env_runner: null
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.realdex_dataset.RealDexDataset
+-  zarr_path: data/realdex_pour.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/realdex_roll.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/realdex_roll.yaml
+deleted file mode 100644
+index 12ede88cba9dd0e172c317489bdcf1f43441e758..0000000000000000000000000000000000000000
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/realdex_roll.yaml
++++ /dev/null
+@@ -1,27 +0,0 @@
+-name: realdex_roll
+-
+-task_name: roll
+-
+-shape_meta: &shape_meta
+-  # acceptable types: rgb, low_dim
+-  obs:
+-    point_cloud:
+-      shape: [1024, 3]
+-      type: point_cloud
+-    agent_pos:
+-      shape: [22]
+-      type: low_dimx
+-  action:
+-    shape: [22]
+-
+-env_runner: null
+-
+-dataset:
+-  _target_: diffusion_policy_3d.dataset.realdex_dataset.RealDexDataset
+-  zarr_path: data/realdex_roll.zarr
+-  horizon: ${horizon}
+-  pad_before: ${eval:'${n_obs_steps}-1'}
+-  pad_after: ${eval:'${n_action_steps}-1'}
+-  seed: 42
+-  val_ratio: 0.02
+-  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/dataset/realdex_dataset.py b/3D-Diffusion-Policy/diffusion_policy_3d/dataset/realdex_dataset.py
+index 1ff9d3a41b1f2caa471525d9e0b330eebdffc359..9ff9d6831fdeaca4cf7e05dc42db1f07c57b6f1b 100644
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/dataset/realdex_dataset.py
++++ b/3D-Diffusion-Policy/diffusion_policy_3d/dataset/realdex_dataset.py
+@@ -19,11 +19,21 @@ class RealDexDataset(BaseDataset):
+             val_ratio=0.0,
+             max_train_episodes=None,
+             task_name=None,
++            depth_est_name=None
+             ):
+         super().__init__()
+         self.task_name = task_name
++        if str(depth_est_name).casefold().startswith(('gt_noisy', 'gt-noisy')):
++            from depth_estimators.gt_noisy import normalize_gt_noisy_name
++            depth_est_name = normalize_gt_noisy_name(depth_est_name)
++        elif str(depth_est_name).casefold().startswith(('gt_d435', 'gt-d435')):
++            from depth_estimators.gt_d435 import normalize_gt_d435_name
++            depth_est_name = normalize_gt_d435_name(depth_est_name)
++        self.pc_key = f'point_cloud_{depth_est_name}' if depth_est_name != "gt" else 'point_cloud'
++        # Collection/preprocessing stores XYZ in the end-effector frame. The
++        # dataset selects the estimator key without applying another transform.
+         self.replay_buffer = ReplayBuffer.copy_from_path(
+-            zarr_path, keys=['state', 'action', 'point_cloud', 'img'])
++            zarr_path, keys=['state', 'action', self.pc_key])
+         val_mask = get_val_mask(
+             n_episodes=self.replay_buffer.n_episodes, 
+             val_ratio=val_ratio,
+@@ -61,7 +71,7 @@ class RealDexDataset(BaseDataset):
+         data = {
+             'action': self.replay_buffer['action'],
+             'agent_pos': self.replay_buffer['state'][...,:],
+-            'point_cloud': self.replay_buffer['point_cloud'],
++            'point_cloud': self.replay_buffer[self.pc_key],
+         }
+         normalizer = LinearNormalizer()
+         normalizer.fit(data=data, last_n_dims=1, mode=mode, **kwargs)
+@@ -72,8 +82,13 @@ class RealDexDataset(BaseDataset):
+         return len(self.sampler)
+ 
+     def _sample_to_data(self, sample):
+-        agent_pos = sample['state'][:,].astype(np.float32) # (agent_posx2, block_posex3)
+-        point_cloud = sample['point_cloud'][:,].astype(np.float32) # (T, 1024, 6)
++        agent_pos = sample['state'][:,].astype(np.float32) # (T, 7): xyz, rotvec, gripper
++        point_cloud = sample[self.pc_key][:,].astype(np.float32) # (T, N, 3): EEF XYZ
++
++
++        # Random flip the gripper states to open/close 30% of the time
++        # if np.random.rand() < 0.3:
++        #     agent_pos[:,-1] = 1.0 - agent_pos[:,-1]
+ 
+         data = {
+             'obs': {
+@@ -89,4 +104,3 @@ class RealDexDataset(BaseDataset):
+         data = self._sample_to_data(sample)
+         torch_data = dict_apply(data, torch.from_numpy)
+         return torch_data
+-
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/env/__init__.py b/3D-Diffusion-Policy/diffusion_policy_3d/env/__init__.py
+index 70f5079041d93d48e1844d7b219c250961459510..89cf06a9f7017348babd556e3f4bdd024f3b61ba 100644
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/env/__init__.py
++++ b/3D-Diffusion-Policy/diffusion_policy_3d/env/__init__.py
+@@ -1,7 +1,4 @@
+ 
+-from .adroit import AdroitEnv
+-from .dexart import DexArtEnv
+-from .metaworld import MetaWorldEnv
+-
++from .rlbench import RLBenchEnv
+ 
+ 
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/env_runner/base_runner.py b/3D-Diffusion-Policy/diffusion_policy_3d/env_runner/base_runner.py
+index 7d072c033cbed3b64f49574729b85732d6ef0d96..0c4f1046c5feb370d1d362f9c72b9e1bc5668b54 100644
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/env_runner/base_runner.py
++++ b/3D-Diffusion-Policy/diffusion_policy_3d/env_runner/base_runner.py
+@@ -5,6 +5,11 @@ from diffusion_policy_3d.policy.base_policy import BasePolicy
+ class BaseRunner:
+     def __init__(self, output_dir):
+         self.output_dir = output_dir
++        self.eval_seed = None
++
++    def set_eval_seed(self, seed):
++        """Set the base seed used for repeatable evaluation episodes."""
++        self.eval_seed = None if seed is None else int(seed)
+ 
+     def run(self, policy: BasePolicy) -> Dict:
+         raise NotImplementedError()
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/gym_util/multistep_wrapper.py b/3D-Diffusion-Policy/diffusion_policy_3d/gym_util/multistep_wrapper.py
+index 33aa56091e5bdd8bac6d3aa919b2788597652645..8e5ca115d4da8ab9f3350497a0c7824aca598b31 100644
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/gym_util/multistep_wrapper.py
++++ b/3D-Diffusion-Policy/diffusion_policy_3d/gym_util/multistep_wrapper.py
+@@ -122,9 +122,9 @@ class MultiStepWrapper(gym.Wrapper):
+         self.done = list()
+         self.info = defaultdict(lambda : deque(maxlen=n_obs_steps+1))
+     
+-    def reset(self):
++    def reset(self, **kwargs):
+         """Resets the environment using kwargs."""
+-        obs = super().reset()
++        obs = super().reset(**kwargs)
+ 
+         self.obs = deque([obs], maxlen=self.n_obs_steps+1)
+         self.reward = list()
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/gym_util/video_recording_wrapper.py b/3D-Diffusion-Policy/diffusion_policy_3d/gym_util/video_recording_wrapper.py
+index d85d4a6e9b590a1a375d8037c7e5d665af21b771..2ec919127fc21684a71d8d4d171e18d74f75d35f 100644
+--- a/3D-Diffusion-Policy/diffusion_policy_3d/gym_util/video_recording_wrapper.py
++++ b/3D-Diffusion-Policy/diffusion_policy_3d/gym_util/video_recording_wrapper.py
+@@ -1,6 +1,8 @@
++import os
++
++import cv2
+ import gym
+ import numpy as np
+-from termcolor import cprint
+ 
+ 
+ class SimpleVideoRecordingWrapper(gym.Wrapper):
+@@ -8,6 +10,8 @@ class SimpleVideoRecordingWrapper(gym.Wrapper):
+             env, 
+             mode='rgb_array',
+             steps_per_render=1,
++            record_rollout_data=False,
++            reference_point_cloud_attr='metric_reference_point_cloud',
+         ):
+         """
+         When file_path is None, don't record.
+@@ -16,16 +20,62 @@ class SimpleVideoRecordingWrapper(gym.Wrapper):
+         
+         self.mode = mode
+         self.steps_per_render = steps_per_render
++        self.record_rollout_data = record_rollout_data
++        self.reference_point_cloud_attr = reference_point_cloud_attr
+ 
+         self.step_count = 0
++        self.frames = []
++        self.agent_positions = []
++        self.observation_point_clouds = []
++        self.reference_point_clouds = []
++        self.episode_seed = None
++
++    def _reset_buffers(self):
++        self.frames = []
++        self.agent_positions = []
++        self.observation_point_clouds = []
++        self.reference_point_clouds = []
++
++    def _record_observation(self, obs):
++        if not self.record_rollout_data:
++            return
++        if not isinstance(obs, dict):
++            raise TypeError(
++                "Rollout data recording requires dict observations, "
++                f"got {type(obs).__name__}."
++            )
++
++        agent_pos = np.asarray(obs['agent_pos'], dtype=np.float32)
++        point_cloud = np.asarray(obs['point_cloud'], dtype=np.float32)
++        if agent_pos.ndim != 1:
++            raise ValueError(f"agent_pos must be 1D, got {agent_pos.shape}")
++        if point_cloud.ndim != 2 or point_cloud.shape[1] < 3:
++            raise ValueError(
++                f"point_cloud must have shape (N, D>=3), got {point_cloud.shape}"
++            )
++
++        self.agent_positions.append(agent_pos.copy())
++        self.observation_point_clouds.append(point_cloud[:, :3].copy())
++
++        reference = getattr(self.env, self.reference_point_cloud_attr, None)
++        if reference is not None:
++            reference = np.asarray(reference, dtype=np.float32)
++            if reference.ndim != 2 or reference.shape[1] < 3:
++                raise ValueError(
++                    "Reference point cloud must have shape (N, D>=3), "
++                    f"got {reference.shape}"
++                )
++            self.reference_point_clouds.append(reference[:, :3].copy())
+ 
+     def reset(self, **kwargs):
+         obs = super().reset(**kwargs)
+-        self.frames = list()
++        self._reset_buffers()
++        self.episode_seed = kwargs.get('seed')
+ 
+         frame = self.env.render(mode=self.mode)
+         assert frame.dtype == np.uint8
+         self.frames.append(frame)
++        self._record_observation(obs)
+         
+         self.step_count = 1
+         return obs
+@@ -37,6 +87,7 @@ class SimpleVideoRecordingWrapper(gym.Wrapper):
+         frame = self.env.render(mode=self.mode)
+         assert frame.dtype == np.uint8
+         self.frames.append(frame)
++        self._record_observation(result[0])
+         
+         return result
+     
+@@ -46,3 +97,80 @@ class SimpleVideoRecordingWrapper(gym.Wrapper):
+         video = video.transpose(0, 3, 1, 2)
+         return video
+ 
++    def save_video(self, file_path, fps=10):
++        """Encode the frames from the current episode as an MP4 file."""
++        if not self.frames:
++            raise RuntimeError("No frames recorded. Call reset() before save_video().")
++        if fps <= 0:
++            raise ValueError(f"fps must be positive, got {fps!r}")
++
++        first_frame = self.frames[0]
++        if first_frame.ndim != 3 or first_frame.shape[2] != 3:
++            raise ValueError(
++                f"Expected RGB frames with shape (H, W, 3), got {first_frame.shape}"
++            )
++
++        height, width = first_frame.shape[:2]
++        parent_dir = os.path.dirname(os.path.abspath(file_path))
++        os.makedirs(parent_dir, exist_ok=True)
++
++        writer = cv2.VideoWriter(
++            file_path,
++            cv2.VideoWriter_fourcc(*'mp4v'),
++            fps,
++            (width, height),
++        )
++        if not writer.isOpened():
++            raise RuntimeError(f"Could not open video writer for {file_path!r}")
++
++        try:
++            for frame_idx, frame in enumerate(self.frames):
++                if frame.dtype != np.uint8 or frame.shape != first_frame.shape:
++                    raise ValueError(
++                        f"Frame {frame_idx} has dtype/shape {frame.dtype}/{frame.shape}; "
++                        f"expected uint8/{first_frame.shape}"
++                    )
++                writer.write(cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
++        finally:
++            writer.release()
++
++    def save_rollout_data(self, file_path, fps=10):
++        """Save synchronized non-RGB rollout observations for offline analysis."""
++        if not self.record_rollout_data:
++            raise RuntimeError("Rollout data recording is disabled for this wrapper.")
++        if not self.agent_positions:
++            raise RuntimeError("No rollout data recorded. Call reset() first.")
++
++        frame_count = len(self.frames)
++        if len(self.agent_positions) != frame_count \
++                or len(self.observation_point_clouds) != frame_count:
++            raise RuntimeError(
++                "RGB/data frame-count mismatch: "
++                f"rgb={frame_count}, agent_pos={len(self.agent_positions)}, "
++                f"point_cloud={len(self.observation_point_clouds)}"
++            )
++
++        payload = {
++            'agent_pos': np.stack(self.agent_positions).astype(np.float32),
++            'obs_pointcloud': np.stack(self.observation_point_clouds).astype(np.float32),
++            'fps': np.asarray(float(fps), dtype=np.float32),
++            'point_cloud_frame': np.asarray('eef'),
++        }
++        if self.episode_seed is not None:
++            payload['episode_seed'] = np.asarray(
++                int(self.episode_seed),
++                dtype=np.int64,
++            )
++        if self.reference_point_clouds:
++            if len(self.reference_point_clouds) != frame_count:
++                raise RuntimeError(
++                    "Reference/data frame-count mismatch: "
++                    f"reference={len(self.reference_point_clouds)}, data={frame_count}"
++                )
++            payload['gt_pointcloud'] = np.stack(
++                self.reference_point_clouds
++            ).astype(np.float32)
++
++        parent_dir = os.path.dirname(os.path.abspath(file_path))
++        os.makedirs(parent_dir, exist_ok=True)
++        np.savez_compressed(file_path, **payload)
+diff --git a/3D-Diffusion-Policy/train.py b/3D-Diffusion-Policy/train.py
+index 2db09e21e8845b11a3b298eeb94c404f76d8feb0..19b97133b8823c043b67b38f169be795585a822e 100644
+--- a/3D-Diffusion-Policy/train.py
++++ b/3D-Diffusion-Policy/train.py
+@@ -87,7 +87,7 @@ class TrainDP3Workspace:
+             RUN_CKPT = True
+             verbose = False
+         
+-        RUN_VALIDATION = False # reduce time cost
++        RUN_VALIDATION = True # reduce time cost
+         
+         # resume training
+         if cfg.training.resume:
+@@ -140,6 +140,9 @@ class TrainDP3Workspace:
+ 
+         if env_runner is not None:
+             assert isinstance(env_runner, BaseRunner)
++            env_runner.set_eval_seed(
++                OmegaConf.select(cfg, 'training.eval_seed', default=None)
++            )
+         
+         cfg.logging.name = str(cfg.logging.name)
+         cprint("-----------------------------", "yellow")
+@@ -158,6 +161,19 @@ class TrainDP3Workspace:
+             }
+         )
+ 
++        # Give fresh runs a step-zero baseline for the rollout success curve.
++        # Add it only to the W&B payload so it cannot affect checkpoint ranking.
++        initial_success_rate_pending = self.global_step == 0 and self.epoch == 0
++
++        def log_wandb_step(data):
++            nonlocal initial_success_rate_pending
++            wandb_data = data
++            if initial_success_rate_pending and self.global_step == 0:
++                wandb_data = dict(data)
++                wandb_data['test_mean_score'] = 0.0
++                initial_success_rate_pending = False
++            wandb_run.log(wandb_data, step=self.global_step)
++
+         # configure checkpoint
+         topk_manager = TopKCheckpointManager(
+             save_dir=os.path.join(self.output_dir, 'checkpoints'),
+@@ -232,7 +248,7 @@ class TrainDP3Workspace:
+                     is_last_batch = (batch_idx == (len(train_dataloader)-1))
+                     if not is_last_batch:
+                         # log of last step is combined with validation and rollout
+-                        wandb_run.log(step_log, step=self.global_step)
++                        log_wandb_step(step_log)
+                         self.global_step += 1
+ 
+                     if (cfg.training.max_train_steps is not None) \
+@@ -251,17 +267,22 @@ class TrainDP3Workspace:
+             policy.eval()
+ 
+             # run rollout
+-            if (self.epoch % cfg.training.rollout_every) == 0 and RUN_ROLLOUT and env_runner is not None:
++            # W&B already receives a hard-coded zero-success baseline for epoch 0.
++            # Skip its expensive rollout and begin evaluation at rollout_every.
++            if (
++                self.epoch > 0
++                and (self.epoch % cfg.training.rollout_every) == 0
++                and RUN_ROLLOUT
++                and env_runner is not None
++            ):
+                 t3 = time.time()
+                 # runner_log = env_runner.run(policy, dataset=dataset)
+                 runner_log = env_runner.run(policy)
+                 t4 = time.time()
+-                # print(f"rollout time: {t4-t3:.3f}")
+                 # log all
+                 step_log.update(runner_log)
+ 
+-            
+-                
++
+             # run validation
+             if (self.epoch % cfg.training.val_every) == 0 and RUN_VALIDATION:
+                 with torch.no_grad():
+@@ -316,32 +337,60 @@ class TrainDP3Workspace:
+                     new_key = key.replace('/', '_')
+                     metric_dict[new_key] = value
+                 
+-                # We can't copy the last checkpoint here
+-                # since save_checkpoint uses threads.
+-                # therefore at this point the file might have been empty!
+-                topk_ckpt_path = topk_manager.get_ckpt_path(metric_dict)
+-
+-                if topk_ckpt_path is not None:
+-                    self.save_checkpoint(path=topk_ckpt_path)
++                # Only rank a checkpoint after its monitored metric has been
++                # computed. In particular, epoch 0 skips rollout and therefore
++                # intentionally has no test_mean_score for top-k selection.
++                monitor_key = topk_manager.monitor_key
++                if monitor_key in metric_dict:
++                    # We can't copy the last checkpoint here since
++                    # save_checkpoint uses threads; it may still be incomplete.
++                    topk_ckpt_path = topk_manager.get_ckpt_path(metric_dict)
++                    if topk_ckpt_path is not None:
++                        self.save_checkpoint(path=topk_ckpt_path)
++                else:
++                    cprint(
++                        f"Skipping top-k checkpoint at epoch {self.epoch}: "
++                        f"metric {monitor_key!r} is not available.",
++                        'yellow',
++                    )
+             # ========= eval end for this epoch ==========
+             policy.train()
+ 
+             # end of epoch
+             # log of last step is combined with validation and rollout
+-            wandb_run.log(step_log, step=self.global_step)
++            log_wandb_step(step_log)
+             self.global_step += 1
+             self.epoch += 1
+             del step_log
+ 
+     def eval(self):
+-        # load the latest checkpoint
+-        
++        # Keep evaluation output independent from the training checkpoint's
++        # directory. This prevents a standalone eval from changing the original
++        # run's logs or Hydra metadata.
++        evaluation_output_dir = self.output_dir
+         cfg = copy.deepcopy(self.cfg)
+-        
+-        lastest_ckpt_path = self.get_checkpoint_path(tag="latest")
+-        if lastest_ckpt_path.is_file():
+-            cprint(f"Resuming from checkpoint {lastest_ckpt_path}", 'magenta')
+-            self.load_checkpoint(path=lastest_ckpt_path)
++        configured_checkpoint_path = OmegaConf.select(
++            cfg,
++            'evaluation.checkpoint_path',
++            default=None,
++        )
++        if configured_checkpoint_path is None:
++            latest_ckpt_path = self.get_checkpoint_path(tag="latest")
++        else:
++            latest_ckpt_path = pathlib.Path(
++                str(configured_checkpoint_path)
++            ).expanduser()
++
++        if latest_ckpt_path.is_file():
++            cprint(f"Resuming from checkpoint {latest_ckpt_path}", 'magenta')
++            self.load_checkpoint(path=latest_ckpt_path)
++            # Older checkpoints may contain _output_dir. Never let that redirect
++            # standalone evaluation artifacts back into the training run.
++            self._output_dir = evaluation_output_dir
++        elif configured_checkpoint_path is not None:
++            raise FileNotFoundError(
++                f"Evaluation checkpoint not found: {latest_ckpt_path}"
++            )
+         
+         # configure env
+         env_runner: BaseRunner
+@@ -349,6 +398,9 @@ class TrainDP3Workspace:
+             cfg.task.env_runner,
+             output_dir=self.output_dir)
+         assert isinstance(env_runner, BaseRunner)
++        env_runner.set_eval_seed(
++            OmegaConf.select(cfg, 'training.eval_seed', default=None)
++        )
+         policy = self.model
+         if cfg.training.use_ema:
+             policy = self.ema_model
+@@ -432,8 +484,7 @@ class TrainDP3Workspace:
+             return pathlib.Path(self.output_dir).joinpath('checkpoints', best_ckpt)
+         else:
+             raise NotImplementedError(f"tag {tag} not implemented")
+-            
+-            
++
+ 
+     def load_payload(self, payload, exclude_keys=None, include_keys=None, **kwargs):
+         if exclude_keys is None:
+diff --git a/README.md b/README.md
+index c8b9f6e37414ff88ad5e75c0dc26a300416f9762..f6ac327af284a6fecb65f9babf8f0da769068683 100644
+--- a/README.md
++++ b/README.md
+@@ -101,7 +101,7 @@ For more detailed arguments, please refer to the scripts and the code. We here p
+ 
+ 2. Train and evaluate a policy with behavior cloning. For example:
+     ```bash
+-    bash scripts/train_policy.sh dp3 adroit_hammer 0112 0 0
++    bash scripts/train_policy.sh dp3 adroit_hammer 0112
+     ```
+     This will train a DP3 policy on the `hammer` task in Adroit environment using point cloud modality. By default we **save** the ckpt (optional in the script).
+ 
+@@ -141,7 +141,7 @@ You can try using our provided real world data to train the policy.
+ 1. Download the real robot data. Put the data under `3D-Diffusion-Policy/data/` folder, e.g. `3D-Diffusion-Policy/data/realdex_drill.zarr`, please keep the path the same as 'zarr_path' in the task's yaml file.
+ 2. Train the policy. For example:
+   ```bash
+-    bash scripts/train_policy.sh dp3 realdex_drill 0112 0 0
++    bash scripts/train_policy.sh dp3 realdex_drill 0112
+   ```
+ 3. For real-world deployment code, you might refer to [iDP3](https://github.com/YanjieZe/Improved-3D-Diffusion-Policy) for a reference.
+    
+diff --git a/scripts/eval_policy.sh b/scripts/eval_policy.sh
+index 149db24f6d11c8e5a66371b5cb882aa601aed018..3945bee274f326a67b003aae7e1f31ebd0275dfc 100644
+--- a/scripts/eval_policy.sh
++++ b/scripts/eval_policy.sh
+@@ -1,36 +1,161 @@
+-# use the same command as training except the script
+-# for example:
+-# bash scripts/eval_policy.sh dp3 adroit_hammer 0322 0 0
++#!/usr/bin/env bash
+ 
++# Usage:
++#   bash scripts/eval_policy.sh <algorithm> <task> <run-tag> [depth-estimator]
++#
++# The arguments must match the training command so that evaluation finds the
++# corresponding data/outputs/<experiment>_seed<seed>/checkpoints directory. The
++# checkpoint with the highest test_mean_score is selected automatically.
++#
++# Examples:
++#   bash scripts/eval_policy.sh dp3 adroit_hammer 0322
++#   bash scripts/eval_policy.sh dp3 rlb_open_box 0721 gt
++#   bash scripts/eval_policy.sh dp3 rlb_open_box 0721 gt_noisy_5mm
++#   bash scripts/eval_policy.sh dp3 rlb_open_box 0721 gt_d435_mild
++#   bash scripts/eval_policy.sh dp3 rlb_open_box 0721 gt_d435_strong
++#   bash scripts/eval_policy.sh dp3 rlb_open_box 0721 map_anything
++#
++# The training-run seed and GPU default to 0. Override them only when needed:
++#   EVAL_SEED=1 EVAL_GPU_ID=2 bash scripts/eval_policy.sh dp3 rlb_open_box 0721 gt
++# Scene seeds are independent of the training-run seed. EVAL_ROLLOUT_SEED
++# defaults to 100000 and episode i uses EVAL_ROLLOUT_SEED + i.
++# Plain gt_d435 can be configured with D435_BASELINE_M,
++# D435_DISPARITY_NOISE_STD_PX, D435_DISPARITY_BIAS_PX,
++# D435_DISPARITY_QUANTIZATION_PX, and D435_NOISE_SEED.
++# Timing is enabled by default and uses plain wall-clock timers. It can be
++# configured with EVAL_SAVE_TIMING and EVAL_TIMING_DIR.
++# EVAL_PROTOCOL=quick (default) uses 5 rollouts; paper uses 50, matching the
++# final DP3 evaluation. EVAL_EPISODES explicitly overrides either preset.
++#   EVAL_PROTOCOL=paper bash scripts/eval_policy.sh dp3 rlb_open_box 0721 gt
++# Evaluation outputs are isolated from training runs under data/eval_outputs.
++# Override the root with EVAL_OUTPUT_ROOT or the full run path with
++# EVAL_OUTPUT_DIR.
+ 
++set -euo pipefail
++
++if (( $# < 3 || $# > 4 )); then
++    echo "Usage: bash scripts/eval_policy.sh <algorithm> <task> <run-tag> [depth-estimator]" >&2
++    exit 2
++fi
+ 
+ DEBUG=False
+ 
+-alg_name=${1}
+-task_name=${2}
++alg_name=$1
++task_name=$2
++addition_info=$3
++depth_est_name=${4:-}
+ config_name=${alg_name}
+-addition_info=${3}
+-seed=${4}
++seed=${EVAL_SEED:-0}
++gpu_id=${EVAL_GPU_ID:-0}
++save_timing=${EVAL_SAVE_TIMING:-true}
++timing_dir=${EVAL_TIMING_DIR:-timing}
++eval_protocol=${EVAL_PROTOCOL:-quick}
++rollout_seed=${EVAL_ROLLOUT_SEED:-100000}
++
++case ${eval_protocol} in
++    quick) default_eval_episodes=5 ;;
++    paper) default_eval_episodes=50 ;;
++    *)
++        echo "EVAL_PROTOCOL must be quick or paper, got: ${eval_protocol}" >&2
++        exit 2
++        ;;
++esac
++eval_episodes=${EVAL_EPISODES:-${default_eval_episodes}}
++
++if [[ ! ${eval_episodes} =~ ^[1-9][0-9]*$ ]]; then
++    echo "EVAL_EPISODES must be a positive integer, got: ${eval_episodes}" >&2
++    exit 2
++fi
++if [[ ! ${rollout_seed} =~ ^[0-9]+$ ]]; then
++    echo "EVAL_ROLLOUT_SEED must be a non-negative integer, got: ${rollout_seed}" >&2
++    exit 2
++fi
++
+ exp_name=${task_name}-${alg_name}-${addition_info}
+-run_dir="data/outputs/${exp_name}_seed${seed}"
++if [[ -n ${depth_est_name} ]]; then
++    exp_name=${exp_name}-${depth_est_name}
++fi
++training_run_dir="data/outputs/${exp_name}_seed${seed}"
++
++script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
++workspace_root=$(cd -- "${script_dir}/../.." && pwd)
++checkpoint_dir="${workspace_root}/${training_run_dir}/checkpoints"
++if [[ ! -d ${checkpoint_dir} ]]; then
++    echo "Checkpoint directory not found: ${checkpoint_dir}" >&2
++    exit 1
++fi
++best_checkpoint_name=$(
++    find "${checkpoint_dir}" -maxdepth 1 -type f \
++        -name 'epoch=*-test_mean_score=*.ckpt' -printf '%f\n' \
++        | sort --field-separator='=' --key=3,3gr \
++        | head -n 1
++)
++if [[ -z ${best_checkpoint_name} ]]; then
++    echo "No best test-score checkpoint found in: ${checkpoint_dir}" >&2
++    echo "Expected a file named epoch=*-test_mean_score=*.ckpt." >&2
++    exit 1
++fi
++checkpoint_path="${checkpoint_dir}/${best_checkpoint_name}"
+ 
+-gpu_id=${5}
++if [[ -n ${EVAL_OUTPUT_DIR:-} ]]; then
++    eval_run_dir=${EVAL_OUTPUT_DIR}
++    if [[ ${eval_run_dir} != /* ]]; then
++        eval_run_dir="${workspace_root}/${eval_run_dir}"
++    fi
++else
++    eval_output_root=${EVAL_OUTPUT_ROOT:-data/eval_outputs}
++    if [[ ${eval_output_root} != /* ]]; then
++        eval_output_root="${workspace_root}/${eval_output_root}"
++    fi
++    eval_base_dir="${eval_output_root}/${exp_name}_seed${seed}"
++    eval_run_idx=0
++    while true; do
++        printf -v eval_run_dir '%s/run_%04d' "${eval_base_dir}" "${eval_run_idx}"
++        if [[ ! -e ${eval_run_dir} ]]; then
++            break
++        fi
++        ((eval_run_idx += 1))
++    done
++fi
+ 
++echo -e "\033[33mBest eval checkpoint: ${checkpoint_path}\033[0m"
++echo -e "\033[33mEval output: ${eval_run_dir}\033[0m"
++echo -e "\033[33mgpu id (to use): ${gpu_id}\033[0m"
++echo -e "\033[33mevaluation protocol: ${eval_protocol}; rollouts: ${eval_episodes}; scene seed: ${rollout_seed}\033[0m"
++echo -e "\033[33mstage timing: ${save_timing} (plain wall clock)\033[0m"
+ 
+-cd 3D-Diffusion-Policy
++cd "${script_dir}/../3D-Diffusion-Policy"
+ 
+ export HYDRA_FULL_ERROR=1
+ export CUDA_VISIBLE_DEVICES=${gpu_id}
+-python eval.py --config-name=${config_name}.yaml \
+-                            task=${task_name} \
+-                            hydra.run.dir=${run_dir} \
+-                            training.debug=$DEBUG \
+-                            training.seed=${seed} \
+-                            training.device="cuda:0" \
+-                            exp_name=${exp_name} \
+-                            logging.mode=${wandb_mode} \
+-                            checkpoint.save_ckpt=${save_ckpt}
+ 
++hydra_overrides=(
++    "task=${task_name}"
++    "hydra.run.dir=${eval_run_dir}"
++    "training.debug=${DEBUG}"
++    "training.seed=${seed}"
++    "training.eval_seed=${rollout_seed}"
++    'training.device=cuda:0'
++    "exp_name=${exp_name}"
++    "+evaluation.checkpoint_path='${checkpoint_path}'"
++    "task.env_runner.eval_episodes=${eval_episodes}"
++    "+task.env_runner.save_timing=${save_timing}"
++    "+task.env_runner.timing_dir=${timing_dir}"
++)
+ 
++# Keep the evaluation environment and point-cloud preprocessing identical to
++# the training run. The estimator in the experiment name alone has no effect.
++if [[ -n ${depth_est_name} ]]; then
++    hydra_overrides+=("task.depth_est_name=${depth_est_name}")
++fi
++if [[ ${depth_est_name,,} == gt_d435* || ${depth_est_name,,} == gt-d435* ]]; then
++    hydra_overrides+=(
++        "+task.env_runner.d435_baseline_m=${D435_BASELINE_M:-0.05}"
++        "+task.env_runner.d435_disparity_noise_std_px=${D435_DISPARITY_NOISE_STD_PX:-0.05}"
++        "+task.env_runner.d435_disparity_bias_px=${D435_DISPARITY_BIAS_PX:-0.02}"
++        "+task.env_runner.d435_disparity_quantization_px=${D435_DISPARITY_QUANTIZATION_PX:-0.03125}"
++        "+task.env_runner.d435_noise_seed=${D435_NOISE_SEED:-0}"
++    )
++fi
+ 
+-                                
+\ No newline at end of file
++python eval.py --config-name="${config_name}.yaml" "${hydra_overrides[@]}"
+diff --git a/scripts/train_policy.sh b/scripts/train_policy.sh
+index 9b900ebbe9db69f958790bf02a0294956a899cad..6cd069454511900cc222579d47663451f3b5960f 100644
+--- a/scripts/train_policy.sh
++++ b/scripts/train_policy.sh
+@@ -1,54 +1,104 @@
++#!/usr/bin/env bash
++
++# Usage:
++#   bash scripts/train_policy.sh <algorithm> <task> <run-tag> [depth-estimator]
++#
+ # Examples:
+-# bash scripts/train_policy.sh dp3 adroit_hammer 0322 0 0
+-# bash scripts/train_policy.sh dp3 dexart_laptop 0322 0 0
+-# bash scripts/train_policy.sh simple_dp3 adroit_hammer 0322 0 0
+-# bash scripts/train_policy.sh dp3 metaworld_basketball 0602 0 0
++#   bash scripts/train_policy.sh dp3 adroit_hammer 0322
++#   bash scripts/train_policy.sh dp3 rlb_close_microwave 0721 gt
++#   bash scripts/train_policy.sh dp3 rlb_close_microwave 0721 gt_noisy_5mm
++#   bash scripts/train_policy.sh dp3 rlb_close_microwave 0721 gt_d435_mild
++#   bash scripts/train_policy.sh dp3 rlb_close_microwave 0721 gt_d435_strong
++#   bash scripts/train_policy.sh dp3 rlb_close_microwave 0721 map_anything
++#
++# The seed and GPU default to 0. Override them only when needed:
++#   TRAIN_SEED=1 TRAIN_GPU_ID=2 bash scripts/train_policy.sh dp3 rlb_close_microwave 0721 gt
++# TRAIN_EVAL_SEED defaults to 100000 independently of TRAIN_SEED. All training
++# checkpoint evaluations therefore use the same scene seeds across variants.
++# Plain gt_d435 can be configured with D435_BASELINE_M,
++# D435_DISPARITY_NOISE_STD_PX, D435_DISPARITY_BIAS_PX,
++# D435_DISPARITY_QUANTIZATION_PX, and D435_NOISE_SEED.
+ 
++set -euo pipefail
+ 
++if (( $# < 3 || $# > 4 )); then
++    echo "Usage: bash scripts/train_policy.sh <algorithm> <task> <run-tag> [depth-estimator]" >&2
++    exit 2
++fi
+ 
+ DEBUG=False
+ save_ckpt=True
+ 
+-alg_name=${1}
+-task_name=${2}
++alg_name=$1
++task_name=$2
++addition_info=$3
++depth_est_name=${4:-}
+ config_name=${alg_name}
+-addition_info=${3}
+-seed=${4}
++seed=${TRAIN_SEED:-0}
++gpu_id=${TRAIN_GPU_ID:-0}
++eval_seed=${TRAIN_EVAL_SEED:-100000}
++
++if [[ ! ${eval_seed} =~ ^[0-9]+$ ]]; then
++    echo "TRAIN_EVAL_SEED must be a non-negative integer, got: ${eval_seed}" >&2
++    exit 2
++fi
++
++# Use the task's RLBench name (without the config-only "rlb_" prefix) for W&B.
++wandb_group=${task_name#rlb_}
++wandb_name=${addition_info}_${wandb_group}
++if [[ -n ${depth_est_name} ]]; then
++    wandb_name=${wandb_name}_${depth_est_name}
++fi
++
+ exp_name=${task_name}-${alg_name}-${addition_info}
++if [[ -n ${depth_est_name} ]]; then
++    exp_name=${exp_name}-${depth_est_name}
++fi
+ run_dir="data/outputs/${exp_name}_seed${seed}"
+ 
+-
+-# gpu_id=$(bash scripts/find_gpu.sh)
+-gpu_id=${5}
+ echo -e "\033[33mgpu id (to use): ${gpu_id}\033[0m"
+ 
+-
+-if [ $DEBUG = True ]; then
++if [[ ${DEBUG} == True ]]; then
+     wandb_mode=offline
+-    # wandb_mode=online
+-    echo -e "\033[33mDebug mode!\033[0m"
+-    echo -e "\033[33mDebug mode!\033[0m"
+     echo -e "\033[33mDebug mode!\033[0m"
+ else
+     wandb_mode=online
+     echo -e "\033[33mTrain mode\033[0m"
+ fi
+ 
+-cd 3D-Diffusion-Policy
++script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
++cd "${script_dir}/../3D-Diffusion-Policy"
+ 
+-
+-export HYDRA_FULL_ERROR=1 
++export HYDRA_FULL_ERROR=1
+ export CUDA_VISIBLE_DEVICES=${gpu_id}
+-python train.py --config-name=${config_name}.yaml \
+-                            task=${task_name} \
+-                            hydra.run.dir=${run_dir} \
+-                            training.debug=$DEBUG \
+-                            training.seed=${seed} \
+-                            training.device="cuda:0" \
+-                            exp_name=${exp_name} \
+-                            logging.mode=${wandb_mode} \
+-                            checkpoint.save_ckpt=${save_ckpt}
+ 
++hydra_overrides=(
++    "task=${task_name}"
++    "hydra.run.dir=${run_dir}"
++    "training.debug=${DEBUG}"
++    "training.seed=${seed}"
++    "training.eval_seed=${eval_seed}"
++    'training.device=cuda:0'
++    "exp_name=${exp_name}"
++    "logging.mode=${wandb_mode}"
++    "logging.group=${wandb_group}"
++    "logging.name=${wandb_name}"
++    "checkpoint.save_ckpt=${save_ckpt}"
++)
+ 
++# This changes the actual task config. Including the estimator in run-tag only
++# changes the experiment name and has no effect on the dataset or environment.
++if [[ -n ${depth_est_name} ]]; then
++    hydra_overrides+=("task.depth_est_name=${depth_est_name}")
++fi
++if [[ ${depth_est_name,,} == gt_d435* || ${depth_est_name,,} == gt-d435* ]]; then
++    hydra_overrides+=(
++        "+task.env_runner.d435_baseline_m=${D435_BASELINE_M:-0.05}"
++        "+task.env_runner.d435_disparity_noise_std_px=${D435_DISPARITY_NOISE_STD_PX:-0.05}"
++        "+task.env_runner.d435_disparity_bias_px=${D435_DISPARITY_BIAS_PX:-0.02}"
++        "+task.env_runner.d435_disparity_quantization_px=${D435_DISPARITY_QUANTIZATION_PX:-0.03125}"
++        "+task.env_runner.d435_noise_seed=${D435_NOISE_SEED:-0}"
++    )
++fi
+ 
+-                                
+\ No newline at end of file
++python train.py --config-name="${config_name}.yaml" "${hydra_overrides[@]}"
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/rlb_basketball.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/rlb_basketball.yaml
+new file mode 100644
+index 0000000000000000000000000000000000000000..497473f08e9436edd6a372093089638eab182923
+--- /dev/null
++++ b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/rlb_basketball.yaml
+@@ -0,0 +1,48 @@
++name: rlb_basketball
++
++task_name: basketball
++depth_est_name: map_anything
++
++shape_meta: &shape_meta
++  # acceptable types: rgb, low_dim
++  obs:
++    point_cloud:
++      shape: [1024, 3]
++      type: point_cloud
++    agent_pos:
++      shape: [7]
++      type: low_dim
++  action:
++    shape: [7]
++
++env_runner:
++  _target_: diffusion_policy_3d.env_runner.rlbench_runner.RLBenchRunner
++  eval_episodes: 50
++  n_obs_steps: ${n_obs_steps}
++  n_action_steps: ${n_action_steps}
++  max_steps: 100
++  fps: 10
++  n_envs: null
++  n_train: null
++  n_test: null
++  task_name: ${task_name}
++  depth_est_name: ${..depth_est_name}
++  camera_names:
++    - 'front'
++    - 'left_shoulder'
++  resolution: 256
++  headless: True
++  debug: False
++  device: ${training.device}
++  use_point_crop: ${policy.use_point_crop}
++
++dataset:
++  _target_: diffusion_policy_3d.dataset.realdex_dataset.RealDexDataset
++  zarr_path: 3D-Diffusion-Policy/3D-Diffusion-Policy/data/${..name}.zarr
++  depth_est_name: ${..depth_est_name}
++  horizon: ${horizon}
++  pad_before: ${eval:'${n_obs_steps}-1'}
++  pad_after: ${eval:'${n_action_steps}-1'}
++  seed: 42
++  val_ratio: 0.02
++  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/rlb_close_box.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/rlb_close_box.yaml
+new file mode 100644
+index 0000000000000000000000000000000000000000..029602d8635ba0f48133d68b76616e370f6eac50
+--- /dev/null
++++ b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/rlb_close_box.yaml
+@@ -0,0 +1,48 @@
++name: rlb_close_box
++
++task_name: close_box
++depth_est_name: map_anything
++
++shape_meta: &shape_meta
++  # acceptable types: rgb, low_dim
++  obs:
++    point_cloud:
++      shape: [1024, 3]
++      type: point_cloud
++    agent_pos:
++      shape: [7]
++      type: low_dim
++  action:
++    shape: [7]
++
++env_runner:
++  _target_: diffusion_policy_3d.env_runner.rlbench_runner.RLBenchRunner
++  eval_episodes: 50
++  n_obs_steps: ${n_obs_steps}
++  n_action_steps: ${n_action_steps}
++  max_steps: 150
++  fps: 10
++  n_envs: null
++  n_train: null
++  n_test: null
++  task_name: ${task_name}
++  depth_est_name: ${..depth_est_name}
++  camera_names:
++    - 'front'
++    - 'left_shoulder'
++  resolution: 256
++  headless: True
++  debug: False
++  device: ${training.device}
++  use_point_crop: ${policy.use_point_crop}
++
++dataset:
++  _target_: diffusion_policy_3d.dataset.realdex_dataset.RealDexDataset
++  zarr_path: 3D-Diffusion-Policy/3D-Diffusion-Policy/data/${..name}.zarr
++  depth_est_name: ${..depth_est_name}
++  horizon: ${horizon}
++  pad_before: ${eval:'${n_obs_steps}-1'}
++  pad_after: ${eval:'${n_action_steps}-1'}
++  seed: 42
++  val_ratio: 0.02
++  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/rlb_close_microwave.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/rlb_close_microwave.yaml
+new file mode 100644
+index 0000000000000000000000000000000000000000..190c75f29af23b4431890f47d14270d88649553e
+--- /dev/null
++++ b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/rlb_close_microwave.yaml
+@@ -0,0 +1,48 @@
++name: rlb_close_microwave
++
++task_name: close_microwave
++depth_est_name: gt
++
++shape_meta: &shape_meta
++  # acceptable types: rgb, low_dim
++  obs:
++    point_cloud:
++      shape: [1024, 3]
++      type: point_cloud
++    agent_pos:
++      shape: [7]
++      type: low_dim
++  action:
++    shape: [7]
++
++env_runner:
++  _target_: diffusion_policy_3d.env_runner.rlbench_runner.RLBenchRunner
++  eval_episodes: 50
++  n_obs_steps: ${n_obs_steps}
++  n_action_steps: ${n_action_steps}
++  max_steps: 80
++  fps: 10
++  n_envs: null
++  n_train: null
++  n_test: null
++  task_name: ${task_name}
++  depth_est_name: ${..depth_est_name}
++  camera_names:
++    - 'front'
++    - 'left_shoulder'
++  resolution: 256
++  headless: True
++  debug: False
++  device: ${training.device}
++  use_point_crop: ${policy.use_point_crop}
++
++dataset:
++  _target_: diffusion_policy_3d.dataset.realdex_dataset.RealDexDataset
++  zarr_path: 3D-Diffusion-Policy/3D-Diffusion-Policy/data/${..name}.zarr
++  depth_est_name: ${..depth_est_name}
++  horizon: ${horizon}
++  pad_before: ${eval:'${n_obs_steps}-1'}
++  pad_after: ${eval:'${n_action_steps}-1'}
++  seed: 42
++  val_ratio: 0.02
++  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/rlb_meat_off_grill.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/rlb_meat_off_grill.yaml
+new file mode 100644
+index 0000000000000000000000000000000000000000..3dc64f49273031ed6e2f248ed3dee1c54b6f0ece
+--- /dev/null
++++ b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/rlb_meat_off_grill.yaml
+@@ -0,0 +1,48 @@
++name: rlb_meat_off_grill
++
++task_name: meat_off_grill
++depth_est_name: gt
++
++shape_meta: &shape_meta
++  # acceptable types: rgb, low_dim
++  obs:
++    point_cloud:
++      shape: [1024, 3]
++      type: point_cloud
++    agent_pos:
++      shape: [7]
++      type: low_dim
++  action:
++    shape: [7]
++
++env_runner:
++  _target_: diffusion_policy_3d.env_runner.rlbench_runner.RLBenchRunner
++  eval_episodes: 50
++  n_obs_steps: ${n_obs_steps}
++  n_action_steps: ${n_action_steps}
++  max_steps: 80
++  fps: 10
++  n_envs: null
++  n_train: null
++  n_test: null
++  task_name: ${task_name}
++  depth_est_name: ${..depth_est_name}
++  camera_names:
++    - 'front'
++    - 'left_shoulder'
++  resolution: 256
++  headless: True
++  debug: False
++  device: ${training.device}
++  use_point_crop: ${policy.use_point_crop}
++
++dataset:
++  _target_: diffusion_policy_3d.dataset.realdex_dataset.RealDexDataset
++  zarr_path: 3D-Diffusion-Policy/3D-Diffusion-Policy/data/${..name}.zarr
++  depth_est_name: ${..depth_est_name}
++  horizon: ${horizon}
++  pad_before: ${eval:'${n_obs_steps}-1'}
++  pad_after: ${eval:'${n_action_steps}-1'}
++  seed: 42
++  val_ratio: 0.02
++  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/rlb_open_box.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/rlb_open_box.yaml
+new file mode 100644
+index 0000000000000000000000000000000000000000..65390423974dcb936cd76d5bfc1d63e0bb60e485
+--- /dev/null
++++ b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/rlb_open_box.yaml
+@@ -0,0 +1,48 @@
++name: rlb_open_box
++
++task_name: open_box
++depth_est_name: moge
++
++shape_meta: &shape_meta
++  # acceptable types: rgb, low_dim
++  obs:
++    point_cloud:
++      shape: [1024, 3]
++      type: point_cloud
++    agent_pos:
++      shape: [7]
++      type: low_dim
++  action:
++    shape: [7]
++
++env_runner:
++  _target_: diffusion_policy_3d.env_runner.rlbench_runner.RLBenchRunner
++  eval_episodes: 50
++  n_obs_steps: ${n_obs_steps}
++  n_action_steps: ${n_action_steps}
++  max_steps: 100
++  fps: 10
++  n_envs: null
++  n_train: null
++  n_test: null
++  task_name: ${task_name}
++  depth_est_name: ${..depth_est_name}
++  camera_names:
++    - 'front'
++    - 'left_shoulder'
++  resolution: 256
++  headless: True
++  debug: False
++  device: ${training.device}
++  use_point_crop: ${policy.use_point_crop}
++
++dataset:
++  _target_: diffusion_policy_3d.dataset.realdex_dataset.RealDexDataset
++  zarr_path: 3D-Diffusion-Policy/3D-Diffusion-Policy/data/${..name}.zarr
++  depth_est_name: ${..depth_est_name}
++  horizon: ${horizon}
++  pad_before: ${eval:'${n_obs_steps}-1'}
++  pad_after: ${eval:'${n_action_steps}-1'}
++  seed: 42
++  val_ratio: 0.02
++  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/rlb_phone_on_base.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/rlb_phone_on_base.yaml
+new file mode 100644
+index 0000000000000000000000000000000000000000..14cc662df1e327fd6f38f45e4416d95f11bc97e3
+--- /dev/null
++++ b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/rlb_phone_on_base.yaml
+@@ -0,0 +1,48 @@
++name: rlb_phone_on_base
++
++task_name: phone_on_base
++depth_est_name: map_anything
++
++shape_meta: &shape_meta
++  # acceptable types: rgb, low_dim
++  obs:
++    point_cloud:
++      shape: [1024, 3]
++      type: point_cloud
++    agent_pos:
++      shape: [7]
++      type: low_dim
++  action:
++    shape: [7]
++
++env_runner:
++  _target_: diffusion_policy_3d.env_runner.rlbench_runner.RLBenchRunner
++  eval_episodes: 50
++  n_obs_steps: ${n_obs_steps}
++  n_action_steps: ${n_action_steps}
++  max_steps: 100
++  fps: 10
++  n_envs: null
++  n_train: null
++  n_test: null
++  task_name: ${task_name}
++  depth_est_name: ${..depth_est_name}
++  camera_names:
++    - 'front'
++    - 'left_shoulder'
++  resolution: 256
++  headless: true
++  debug: false
++  device: ${training.device}
++  use_point_crop: ${policy.use_point_crop}
++
++dataset:
++  _target_: diffusion_policy_3d.dataset.realdex_dataset.RealDexDataset
++  zarr_path: 3D-Diffusion-Policy/3D-Diffusion-Policy/data/rlb_phone_on_base.zarr
++  depth_est_name: ${..depth_est_name}
++  horizon: ${horizon}
++  pad_before: ${eval:'${n_obs_steps}-1'}
++  pad_after: ${eval:'${n_action_steps}-1'}
++  seed: 42
++  val_ratio: 0.02
++  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/rlb_plate_out.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/rlb_plate_out.yaml
+new file mode 100644
+index 0000000000000000000000000000000000000000..0f1ab006d3cd2fb6582064bb83f5bcd3f579e69f
+--- /dev/null
++++ b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/rlb_plate_out.yaml
+@@ -0,0 +1,48 @@
++name: rlb_plate_out
++
++task_name: plate_out
++depth_est_name: mast3r
++
++shape_meta: &shape_meta
++  # acceptable types: rgb, low_dim
++  obs:
++    point_cloud:
++      shape: [1024, 3]
++      type: point_cloud
++    agent_pos:
++      shape: [7]
++      type: low_dim
++  action:
++    shape: [7]
++
++env_runner:
++  _target_: diffusion_policy_3d.env_runner.rlbench_runner.RLBenchRunner
++  eval_episodes: 50
++  n_obs_steps: ${n_obs_steps}
++  n_action_steps: ${n_action_steps}
++  max_steps: 150
++  fps: 10
++  n_envs: null
++  n_train: null
++  n_test: null
++  task_name: ${task_name}
++  depth_est_name: ${..depth_est_name}
++  camera_names:
++    - 'front'
++    - 'left_shoulder'
++  resolution: 256
++  headless: true
++  debug: False
++  device: ${training.device}
++  use_point_crop: ${policy.use_point_crop}
++
++dataset:
++  _target_: diffusion_policy_3d.dataset.realdex_dataset.RealDexDataset
++  zarr_path: 3D-Diffusion-Policy/3D-Diffusion-Policy/data/${..name}.zarr
++  depth_est_name: ${..depth_est_name}
++  horizon: ${horizon}
++  pad_before: ${eval:'${n_obs_steps}-1'}
++  pad_after: ${eval:'${n_action_steps}-1'}
++  seed: 42
++  val_ratio: 0.02
++  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/rlb_toilet_roll_off.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/rlb_toilet_roll_off.yaml
+new file mode 100644
+index 0000000000000000000000000000000000000000..b789392f82e3b7bed29736eb0c625f8db28d17c9
+--- /dev/null
++++ b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/rlb_toilet_roll_off.yaml
+@@ -0,0 +1,48 @@
++name: rlb_toilet_roll_off
++
++task_name: toilet_roll_off
++depth_est_name: mast3r
++
++shape_meta: &shape_meta
++  # acceptable types: rgb, low_dim
++  obs:
++    point_cloud:
++      shape: [1024, 3]
++      type: point_cloud
++    agent_pos:
++      shape: [7]
++      type: low_dim
++  action:
++    shape: [7]
++
++env_runner:
++  _target_: diffusion_policy_3d.env_runner.rlbench_runner.RLBenchRunner
++  eval_episodes: 50
++  n_obs_steps: ${n_obs_steps}
++  n_action_steps: ${n_action_steps}
++  max_steps: 120
++  fps: 10
++  n_envs: null
++  n_train: null
++  n_test: null
++  task_name: ${task_name}
++  depth_est_name: ${..depth_est_name}
++  camera_names:
++    - 'front'
++    - 'left_shoulder'
++  resolution: 256
++  headless: True
++  debug: False
++  device: ${training.device}
++  use_point_crop: ${policy.use_point_crop}
++
++dataset:
++  _target_: diffusion_policy_3d.dataset.realdex_dataset.RealDexDataset
++  zarr_path: 3D-Diffusion-Policy/3D-Diffusion-Policy/data/${..name}.zarr
++  depth_est_name: ${..depth_est_name}
++  horizon: ${horizon}
++  pad_before: ${eval:'${n_obs_steps}-1'}
++  pad_after: ${eval:'${n_action_steps}-1'}
++  seed: 42
++  val_ratio: 0.02
++  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/rlb_toilet_seat_down.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/rlb_toilet_seat_down.yaml
+new file mode 100644
+index 0000000000000000000000000000000000000000..cd46328da69b0963ed22d0ad4b722eb9fdc56ff2
+--- /dev/null
++++ b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/rlb_toilet_seat_down.yaml
+@@ -0,0 +1,48 @@
++name: rlb_toilet_seat_down
++
++task_name: toilet_seat_down
++depth_est_name: map_anything
++
++shape_meta: &shape_meta
++  # acceptable types: rgb, low_dim
++  obs:
++    point_cloud:
++      shape: [1024, 3]
++      type: point_cloud
++    agent_pos:
++      shape: [7]
++      type: low_dim
++  action:
++    shape: [7]
++
++env_runner:
++  _target_: diffusion_policy_3d.env_runner.rlbench_runner.RLBenchRunner
++  eval_episodes: 50
++  n_obs_steps: ${n_obs_steps}
++  n_action_steps: ${n_action_steps}
++  max_steps: 100
++  fps: 10
++  n_envs: null
++  n_train: null
++  n_test: null
++  task_name: ${task_name}
++  depth_est_name: ${..depth_est_name}
++  camera_names:
++    - 'front'
++    - 'left_shoulder'
++  resolution: 256
++  headless: True
++  debug: False
++  device: ${training.device}
++  use_point_crop: ${policy.use_point_crop}
++
++dataset:
++  _target_: diffusion_policy_3d.dataset.realdex_dataset.RealDexDataset
++  zarr_path: 3D-Diffusion-Policy/3D-Diffusion-Policy/data/${..name}.zarr
++  depth_est_name: ${..depth_est_name}
++  horizon: ${horizon}
++  pad_before: ${eval:'${n_obs_steps}-1'}
++  pad_after: ${eval:'${n_action_steps}-1'}
++  seed: 42
++  val_ratio: 0.02
++  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/config/task/rlb_toilet_seat_up.yaml b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/rlb_toilet_seat_up.yaml
+new file mode 100644
+index 0000000000000000000000000000000000000000..a422c7bc35eeecbd327d59c0bf3c503029325786
+--- /dev/null
++++ b/3D-Diffusion-Policy/diffusion_policy_3d/config/task/rlb_toilet_seat_up.yaml
+@@ -0,0 +1,48 @@
++name: rlb_toilet_seat_up
++
++task_name: toilet_seat_up
++depth_est_name: gt
++
++shape_meta: &shape_meta
++  # acceptable types: rgb, low_dim
++  obs:
++    point_cloud:
++      shape: [1024, 3]
++      type: point_cloud
++    agent_pos:
++      shape: [7]
++      type: low_dim
++  action:
++    shape: [7]
++
++env_runner:
++  _target_: diffusion_policy_3d.env_runner.rlbench_runner.RLBenchRunner
++  eval_episodes: 50
++  n_obs_steps: ${n_obs_steps}
++  n_action_steps: ${n_action_steps}
++  max_steps: 150
++  fps: 10
++  n_envs: null
++  n_train: null
++  n_test: null
++  task_name: ${task_name}
++  depth_est_name: ${..depth_est_name}
++  camera_names:
++    - 'front'
++    - 'left_shoulder'
++  resolution: 256
++  headless: True
++  debug: False
++  device: ${training.device}
++  use_point_crop: ${policy.use_point_crop}
++
++dataset:
++  _target_: diffusion_policy_3d.dataset.realdex_dataset.RealDexDataset
++  zarr_path: 3D-Diffusion-Policy/3D-Diffusion-Policy/data/${..name}.zarr
++  depth_est_name: ${..depth_est_name}
++  horizon: ${horizon}
++  pad_before: ${eval:'${n_obs_steps}-1'}
++  pad_after: ${eval:'${n_action_steps}-1'}
++  seed: 42
++  val_ratio: 0.02
++  max_train_episodes: 90
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/env/rlbench/__init__.py b/3D-Diffusion-Policy/diffusion_policy_3d/env/rlbench/__init__.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..e3654a304fb166c020ccee47e366938778c3db43
+--- /dev/null
++++ b/3D-Diffusion-Policy/diffusion_policy_3d/env/rlbench/__init__.py
+@@ -0,0 +1 @@
++from .rlbench_wrapper import RLBenchEnv
+\ No newline at end of file
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/env/rlbench/rlbench_wrapper.py b/3D-Diffusion-Policy/diffusion_policy_3d/env/rlbench/rlbench_wrapper.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..f4f8f3c7559718b13e95589a279b970370b31b61
+--- /dev/null
++++ b/3D-Diffusion-Policy/diffusion_policy_3d/env/rlbench/rlbench_wrapper.py
+@@ -0,0 +1,464 @@
++import os
++import time
++import cv2
++import pdb
++import argparse
++import pickle
++import open3d as o3d
++import numpy as np
++from scipy.spatial.transform import Rotation as Rot
++import json
++from tqdm import tqdm
++from rlbench.action_modes.action_mode import MoveArmThenGripper
++from rlbench.action_modes.arm_action_modes import JointVelocity, EndEffectorPoseViaIK, EndEffectorPoseViaPlanning
++from rlbench.action_modes.gripper_action_modes import Discrete
++from rlbench.environment import Environment, TaskEnvironment
++from rlbench.observation_config import CameraConfig, ObservationConfig
++from rlbench.tasks import PhoneOnBase
++from tqdm import trange
++from rlbench.tasks import *
++from rlb_cameras import RLBCameras
++from pcd_scaler import scale_icp
++from utils import visualise_pcds
++import matplotlib.pyplot as plt
++from utils import pose_7dof_to_6dof, transform_to_7d_pose, pose_6dof_to_transform, pose_7dof_to_transform, transform_pcd
++from rlb_point_cloud import preprocess_point_cloud
++try:
++    import gym
++    from gym import spaces
++except ModuleNotFoundError:
++    import gymnasium as gym
++    from gymnasium import spaces
++
++
++TASK_NAMES = {
++    'lift_lid': TakeLidOffSaucepan,
++    'phone_on_base': PhoneOnBase,
++    'open_box': OpenBox,
++    'slide_block': SlideBlockToTarget,
++    'close_box': CloseBox,
++    'basketball': BasketballInHoop,
++    'buzz': BeatTheBuzz,
++    'close_microwave': CloseMicrowave,
++    'plate_out': TakePlateOffColoredDishRack,
++    'toilet_seat_down': ToiletSeatDown,
++    'toilet_seat_up': ToiletSeatUp,
++    'toilet_roll_off': TakeToiletRollOffStand,
++    'open_microwave': OpenMicrowave,
++    'lamp_on': LampOn,
++    'umbrella_out': TakeUmbrellaOutOfUmbrellaStand,
++    'push_button': PushButton,
++    'put_rubbish': PutRubbishInBin,
++    'close_jar': CloseJar,
++    'open_jar': OpenJar,
++    'meat_off_grill': MeatOffGrill
++}
++
++
++class RLBenchEnv(gym.Env):
++    def __init__(self, 
++                 task_name="phone_on_base",
++                 depth_estimator=None,
++                 camera_names=['front', 'left_shoulder'], 
++                 resolution=128, 
++                 num_points=1024,
++                 headless=False,
++                 debug=False,
++                 record_point_cloud_reference=False,
++                 gt_noise_std_m=0.010,
++                 gt_noise_seed=0):
++        obs_config = ObservationConfig()
++        obs_config.set_all_low_dim(True)
++        obs_config.set_all_high_dim(False)
++
++        self.depth_estimator = depth_estimator
++        self.resolution = resolution
++        self.camera_names = camera_names
++        self.mask_input = False
++        self.num_points = num_points
++        self.debug = debug
++        self.record_point_cloud_reference = record_point_cloud_reference
++        self.gt_noise_std_m = float(gt_noise_std_m)
++        self.gt_noise_seed = int(gt_noise_seed)
++        self._render_frame = None
++        self._latest_gt_point_cloud_world = None
++        self._last_point_cloud_timing = None
++        self._timing_records = []
++        self.metric_reference_point_cloud = None
++        for cam_name in camera_names:
++            cam = getattr(obs_config, f'{cam_name}_camera')
++            cam.set_all(True)
++            cam.depth_in_meters = True
++    
++        action_mode = MoveArmThenGripper(
++            arm_action_mode=EndEffectorPoseViaIK(),
++            gripper_action_mode=Discrete()
++        )
++        self.env = Environment(action_mode, './', obs_config=obs_config, headless=headless)
++        self.env.launch()
++        self.task = self.env.get_task(TASK_NAMES[task_name])
++        
++        def temp(position, euler=None, quaternion=None, ignore_collisions=False, trials=300, max_configs=1,
++                    distance_threshold=0.65, max_time_ms=10, trials_per_goal=1, algorithm=None, relative_to=None):
++                return self.env._robot.arm.get_linear_path(
++                    position, euler, quaternion, ignore_collisions=ignore_collisions, relative_to=relative_to
++                )
++
++        self.env._robot.arm.get_path = temp
++        self.env._scene._start_arm_joint_pos = np.array([6.74760377e-05, -1.91104114e-02, -3.62065766e-05, -1.64271665e+00,
++                                                        -1.14094291e-07, 1.55336857e+00, 7.85427451e-01])
++
++        rot_bounds = self.env._scene.task.base_rotation_bounds()
++        mean_rot = (rot_bounds[0][2] + rot_bounds[1][2]) / 2
++        # Restrict rotation
++        self.env._scene.task.base_rotation_bounds = lambda: ((0.0, 0.0, max(rot_bounds[0][2], mean_rot - np.pi / 3)),
++                                                            (0.0, 0.0, min(rot_bounds[1][2], mean_rot + np.pi / 3)))
++
++        for camera_name in self.camera_names:
++            if camera_name == 'front':
++                cam = self.task._scene._cam_front
++                cam_mask = self.task._scene._cam_front_mask
++            elif camera_name == 'left_shoulder':
++                cam = self.task._scene._cam_over_shoulder_left
++                cam_mask = self.task._scene._cam_over_shoulder_left_mask
++                cam.set_far_clipping_plane(4.5)
++                cam_mask.set_far_clipping_plane(4.5)
++                cam.set_pose([0.2, 1.3, 1.5, 0.819, 0., 0., 0.574])
++                cam_mask.set_pose([0.2, 1.3, 1.5, 0.819, 0., 0., 0.574])
++            elif camera_name == 'right_shoulder':
++                cam = self.task._scene._cam_over_shoulder_right
++                cam_mask = self.task._scene._cam_over_shoulder_right_mask
++            elif camera_name == 'wrist':
++                cam = self.task._scene._cam_wrist
++                cam_mask = self.task._scene._cam_wrist_mask
++
++            cam.set_resolution([self.resolution, self.resolution])
++            cam_mask.set_resolution([self.resolution, self.resolution])
++
++        # Config for MultiStepWrapper
++        self.action_space = spaces.Box(
++            low=-1.0,
++            high=1.0,
++            shape=(7,),
++            dtype=np.float64
++        )
++
++        self.observation_space = spaces.Dict({
++            'image': spaces.Box(
++                low=0,
++                high=255,
++                shape=(3, self.resolution, self.resolution),
++                dtype=np.float32
++            ),
++            'depth': spaces.Box(
++                low=0,
++                high=255,
++                shape=(self.resolution, self.resolution),
++                dtype=np.float32
++            ),
++            'agent_pos': spaces.Box(
++                low=-np.inf,
++                high=np.inf,
++                shape=(7,),
++                dtype=np.float32
++            ),
++            'point_cloud': spaces.Box(
++                low=-np.inf,
++                high=np.inf,
++                shape=(self.num_points, 3),
++                dtype=np.float32
++            ),
++        })
++
++
++    def reset(self, seed=None, **kwargs):
++        self._timing_records = []
++        self._last_point_cloud_timing = None
++        if seed is None:
++            self.task.reset()
++        else:
++            # RLBench scene placement uses NumPy's global RNG. Restore its
++            # previous state afterward so scene sampling does not perturb
++            # depth estimation, ICP, training, or policy randomness.
++            previous_state = np.random.get_state()
++            try:
++                np.random.seed(int(seed))
++                self.task.reset()
++            finally:
++                np.random.set_state(previous_state)
++        if (
++            self.depth_estimator is not None
++            and getattr(self.depth_estimator, 'uses_gt_depth', False)
++        ):
++            self.depth_estimator.reset(seed)
++        curr_obs = self.task.get_observation()
++        return self._observation_to_dict(curr_obs)
++
++        
++    def step(self, action):
++        curr_obs = self.task.get_observation()
++        T_curr = pose_7dof_to_transform(curr_obs.gripper_pose)
++        T_delta = pose_6dof_to_transform(action[:6])
++        T_new = T_curr @ T_delta
++
++        env_action = np.zeros(8)
++        env_action[:7] = transform_to_7d_pose(T_new)
++        env_action[7] = int(action[6] > 0.5)
++
++        try:
++            curr_obs, reward, terminate = self.task.step(env_action)
++            success = int(terminate and reward > 0.)
++        except Exception as e:
++            terminate = True
++            reward = -1
++            success = 0
++
++        obs_dict = self._observation_to_dict(curr_obs)
++        return obs_dict, reward, terminate, {'success': success}
++
++    def _observation_to_dict(self, curr_obs):
++        """Build the policy observation and optional same-step metric reference."""
++        self._render_frame = curr_obs.front_rgb.copy()
++
++        pcd = self.get_point_cloud(curr_obs)
++        point_cloud_preprocessing_start = time.time()
++        # A two-camera 256x256 cloud can contain ~131k candidates. PyTorch3D's
++        # CUDA farthest-point sampler processes all of them in one long-running
++        # kernel, which can trip the display-driver watchdog during long
++        # rollouts. The CPU implementation takes about 0.5s at this size and
++        # returns the same deterministic farthest-point sample.
++        obs_pointcloud = preprocess_point_cloud(pcd, use_cuda=False)
++        T_WE = pose_7dof_to_transform(curr_obs.gripper_pose)
++        T_EW = np.linalg.inv(T_WE)
++        obs_pointcloud = transform_pcd(obs_pointcloud, T_EW).astype(np.float32)
++
++        robot_pose = pose_7dof_to_6dof(curr_obs.gripper_pose)
++        gripper_state = curr_obs.gripper_open
++        robot_state = np.concatenate([robot_pose, [gripper_state]]).astype(np.float32)
++
++        # Stop the policy-input timer before building the optional reference
++        # cloud, which is saved only for offline geometric analysis.
++        point_cloud_preprocessing_s = (
++            time.time() - point_cloud_preprocessing_start
++        )
++
++        if self.record_point_cloud_reference:
++            if self.depth_estimator is None:
++                reference_point_cloud = obs_pointcloud.copy()
++            else:
++                if self._latest_gt_point_cloud_world is None:
++                    raise RuntimeError("GT point-cloud reference was not generated.")
++                reference_point_cloud = preprocess_point_cloud(
++                    self._latest_gt_point_cloud_world,
++                    use_cuda=False,
++                )
++                reference_point_cloud = transform_pcd(
++                    reference_point_cloud,
++                    T_EW,
++                ).astype(np.float32)
++            self.metric_reference_point_cloud = reference_point_cloud
++        else:
++            self.metric_reference_point_cloud = None
++
++        point_cloud_timing = self._last_point_cloud_timing or {}
++        self._timing_records.append({
++            "rgb_preprocessing_s": float(
++                point_cloud_timing.get("rgb_preprocessing_s", 0.0)
++            ),
++            "depth_estimation_s": float(
++                point_cloud_timing.get("depth_estimation_s", 0.0)
++            ),
++            "point_cloud_reconstruction_s": float(
++                point_cloud_timing.get("point_cloud_reconstruction_s", 0.0)
++            ),
++            "point_cloud_preprocessing_s": float(
++                point_cloud_preprocessing_s
++            ),
++        })
++
++        return {
++            'image': curr_obs.front_rgb,
++            'depth': curr_obs.front_depth,
++            'agent_pos': robot_state,
++            'point_cloud': obs_pointcloud,
++        }
++
++    def pop_timing_records(self):
++        """Return observation-stage timings accumulated since the last call."""
++        records = self._timing_records
++        self._timing_records = []
++        return records
++
++    def render(self, mode='rgb_array'):
++        """Return the latest front-camera RGB frame for video recording."""
++        if mode != 'rgb_array':
++            raise ValueError(f"Unsupported render mode: {mode!r}")
++        if self._render_frame is None:
++            raise RuntimeError("Call reset() before render().")
++        return self._render_frame.copy()
++    
++
++    def get_point_cloud(self, obs):
++        rgb_preprocessing_start = time.time()
++        self._latest_gt_point_cloud_world = None
++        
++        use_gt = (
++            self.depth_estimator is None
++            or getattr(self.depth_estimator, 'uses_gt_depth', False)
++        )
++        corrupt_gt_depth = (
++            self.depth_estimator is not None
++            and getattr(self.depth_estimator, 'uses_gt_depth', False)
++        )
++
++        intrinsics = []
++        extrinsics = []
++        depths = []
++        rgbs = []
++        masks = []
++        gt_pcds = []
++
++        for name in self.camera_names:
++            gt_pcds.append(getattr(obs, f'{name}_point_cloud').reshape(-1, 3))
++            masks.append(getattr(obs, f'{name}_mask') > 60)
++
++            if not use_gt:
++                rgbs.append(getattr(obs, f'{name}_rgb'))
++
++            if name == 'front':
++                camera = self.task._scene._cam_front
++            elif name == 'left_shoulder':
++                camera = self.task._scene._cam_over_shoulder_left
++            elif name == 'right_shoulder':
++                camera = self.task._scene._cam_over_shoulder_right
++            elif name == 'wrist':
++                camera = self.task._scene._cam_wrist
++
++            camera_intrinsics = camera.get_intrinsic_matrix()
++            intrinsics.append(camera_intrinsics)
++            extrinsics.append(camera.get_matrix() if name != 'wrist' else obs.wrist_matrix)
++
++            if use_gt:
++                depth = getattr(obs, f'{name}_depth')
++                depths.append(depth)
++
++        # Visualise rgbs and masked rgbs
++        if self.mask_input:
++            masked_rgbs = []
++            for i in range(len(rgbs)):
++                masked_rgb = rgbs[i].copy()
++                masked_rgb[~masks[i]] = 0
++                masked_rgbs.append(masked_rgb)
++
++
++        rgb_preprocessing_s = time.time() - rgb_preprocessing_start
++        depth_estimation_start = time.time()
++        if use_gt and corrupt_gt_depth:
++            depths = [
++                self.depth_estimator.corrupt_depth(depth, intrinsic)
++                for depth, intrinsic in zip(depths, intrinsics)
++            ]
++        elif not use_gt:
++            if self.mask_input:
++                est_data = self.depth_estimator.infer(masked_rgbs, intrinsics, extrinsics)
++            else:
++                est_data = self.depth_estimator.infer(rgbs, intrinsics, extrinsics)
++
++            if 'depth' in est_data.keys():
++                depths = [data for data in est_data['depth']]
++            elif 'pts3d' in est_data.keys():
++                pcd = est_data['pts3d']
++                visualise_pcds([pcd], extrinsics, intrinsics, gt_pcds)
++
++        depth_estimation_s = time.time() - depth_estimation_start
++        point_cloud_reconstruction_start = time.time()
++
++        def finish_reconstruction(point_cloud):
++            self._last_point_cloud_timing = {
++                'rgb_preprocessing_s': float(rgb_preprocessing_s),
++                'depth_estimation_s': float(depth_estimation_s),
++                'point_cloud_reconstruction_s': float(
++                    time.time() - point_cloud_reconstruction_start
++                ),
++            }
++            # This reference is a rollout-analysis artifact and is not consumed
++            # by the policy, so keep its cost outside the reconstruction stage.
++            if (
++                self.record_point_cloud_reference
++                and self.depth_estimator is not None
++            ):
++                gt_masked_pcd = [
++                    pcd[mask.reshape(-1)]
++                    for pcd, mask in zip(gt_pcds, masks)
++                ]
++                self._latest_gt_point_cloud_world = np.concatenate(
++                    gt_masked_pcd,
++                    axis=0,
++                )
++            return point_cloud
++
++        # Mask erosion to remove edges
++        for i, mask in enumerate(masks):
++            if self.resolution == 512:
++                kernel = np.ones((5, 5), np.uint8)  # PhoneOnBase
++            elif self.resolution == 256:
++                kernel = np.ones((3, 3), np.uint8)
++            else:
++                kernel = np.ones((2, 2), np.uint8)
++            masks[i] = cv2.erode(mask.astype(np.uint8), kernel, iterations=1).astype(bool)
++
++        repr = RLBCameras.reproject_to_pcd
++        # repr = RLBCameras.reproject_to_pcd_o3d
++        if len(depths) > len(intrinsics):
++            depths = depths[:len(intrinsics)]
++        reprojected_pcds = [repr(depths[i], intrinsics[i], extrinsics[i], masks[i]) for i in range(len(depths))]
++
++        if self.debug:
++            visualise_pcds(reprojected_pcds, extrinsics, intrinsics, gt_pcds)
++
++        # Outlier removal for specific depth estimators
++        if self.depth_estimator is not None and self.depth_estimator.name == 'map_anything':
++            for i, pcd in enumerate(reprojected_pcds):
++                pcd_noisy = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(pcd))
++                # o3d.visualization.draw_geometries([pcd_noisy])
++                nb_neighbors = int(70 * self.resolution ** 2 / 700 ** 2)
++                pcd_sor, ind_sor = pcd_noisy.remove_statistical_outlier(nb_neighbors=nb_neighbors, std_ratio=2.0)
++                # o3d.visualization.draw_geometries([pcd_sor])
++                # pcd_ror, ind_ror = pcd_sor.remove_radius_outlier(nb_points=10, radius=0.01)
++                # o3d.visualization.draw_geometries([pcd_ror])
++                reprojected_pcds[i] = np.asarray(pcd_sor.points)
++                if reprojected_pcds[i].shape[0] == 0:
++                    pcd_eliminated = True
++
++        # Check if any reprojected pcd is empty, which can happen if the depth estimator fails to produce valid points
++        pcd_eliminated = False
++        for i in range(len(reprojected_pcds)):
++            if reprojected_pcds[i].shape[0] == 0:
++                pcd_eliminated = True
++                break
++
++        if use_gt or len(reprojected_pcds) == 1 or pcd_eliminated:
++            scaled_pcds = reprojected_pcds
++            return finish_reconstruction(np.concatenate(scaled_pcds, axis=0))
++        else:
++            try:
++                scaled_pcds, best_scale = scale_icp(reprojected_pcds,
++                                                    extrinsics,
++                                                    previous_scale=None,
++                                                    n_initialisations=8,
++                                                    max_iterations=30,
++                                                    intrinsics=(self.task._scene._cam_front.get_resolution(), intrinsics[0]),
++                                                    visualise=False)
++            except:
++                pdb.set_trace()
++        
++        # Visualise unscaled pcds
++        if self.debug:
++            visualise_pcds(scaled_pcds, extrinsics, intrinsics, gt_pcds)
++
++        pruned_pcds = []
++        for scale_idx in range(len(scaled_pcds)):
++            if scaled_pcds[scale_idx].shape[0] != 0:
++                pruned_pcds.append(scaled_pcds[scale_idx])
++
++        return finish_reconstruction(np.concatenate(pruned_pcds, axis=0))
+diff --git a/3D-Diffusion-Policy/diffusion_policy_3d/env_runner/rlbench_runner.py b/3D-Diffusion-Policy/diffusion_policy_3d/env_runner/rlbench_runner.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..ee374e46599669ea195d439dd557766e20e6408e
+--- /dev/null
++++ b/3D-Diffusion-Policy/diffusion_policy_3d/env_runner/rlbench_runner.py
+@@ -0,0 +1,638 @@
++import csv
++import json
++import os
++import tempfile
++import time
++from collections import defaultdict
++from pathlib import Path
++
++import numpy as np
++import torch
++import tqdm
++from diffusion_policy_3d.env import RLBenchEnv
++from diffusion_policy_3d.gym_util.multistep_wrapper import MultiStepWrapper
++from diffusion_policy_3d.gym_util.video_recording_wrapper import SimpleVideoRecordingWrapper
++
++from diffusion_policy_3d.policy.base_policy import BasePolicy
++from diffusion_policy_3d.common.pytorch_util import dict_apply
++from diffusion_policy_3d.env_runner.base_runner import BaseRunner
++import diffusion_policy_3d.common.logger_util as logger_util
++from termcolor import cprint
++
++
++STAGE_FIELDS = (
++    'rgb_preprocessing_ms',
++    'depth_estimation_ms',
++    'point_cloud_reconstruction_ms',
++    'point_cloud_preprocessing_ms',
++    'policy_input_preprocessing_ms',
++    'data_preprocessing_ms',
++    'policy_inference_ms',
++    'policy_output_postprocessing_ms',
++    'total_pipeline_ms',
++)
++
++STEP_ID_FIELDS = (
++    'episode_index',
++    'episode_seed',
++    'policy_step_index',
++    'rollout_success',
++    'trajectory_reward',
++    'observation_count',
++)
++
++STAGE_DESCRIPTIONS = {
++    'rgb_preprocessing_ms': (
++        'Camera RGB/mask/calibration extraction and estimator-input masking.'
++    ),
++    'depth_estimation_ms': (
++        'Depth-estimator inference, or configured GT-depth corruption.'
++    ),
++    'point_cloud_reconstruction_ms': (
++        'Mask erosion, depth unprojection, outlier handling, scaling/ICP, '
++        'and camera-cloud concatenation.'
++    ),
++    'point_cloud_preprocessing_ms': (
++        'Point sampling, robot-state preparation, and world-to-EEF transforms.'
++    ),
++    'policy_input_preprocessing_ms': (
++        'NumPy-to-torch conversion, device transfer, and policy batching.'
++    ),
++    'data_preprocessing_ms': (
++        'Point-cloud preprocessing plus policy-input preprocessing.'
++    ),
++    'policy_inference_ms': 'Wall-clock policy.predict_action execution.',
++    'policy_output_postprocessing_ms': (
++        'Policy tensor detachment, CPU transfer, NumPy conversion, and '
++        'action extraction.'
++    ),
++    'total_pipeline_ms': (
++        'Sum from RGB preprocessing through final policy action output; '
++        'simulator stepping is excluded.'
++    ),
++}
++
++
++def _atomic_csv(path, rows, headers):
++    path = Path(path)
++    path.parent.mkdir(parents=True, exist_ok=True)
++    temp_path = None
++    try:
++        with tempfile.NamedTemporaryFile(
++            mode='w',
++            encoding='utf-8',
++            newline='',
++            prefix=f'.{path.stem}.',
++            suffix='.tmp',
++            dir=path.parent,
++            delete=False,
++        ) as output_file:
++            temp_path = Path(output_file.name)
++            writer = csv.DictWriter(output_file, fieldnames=headers)
++            writer.writeheader()
++            writer.writerows(rows)
++        temp_path.replace(path)
++        temp_path = None
++    finally:
++        if temp_path is not None:
++            temp_path.unlink(missing_ok=True)
++
++
++def _atomic_json(path, payload):
++    path = Path(path)
++    path.parent.mkdir(parents=True, exist_ok=True)
++    temp_path = None
++    try:
++        with tempfile.NamedTemporaryFile(
++            mode='w',
++            encoding='utf-8',
++            prefix=f'.{path.stem}.',
++            suffix='.tmp',
++            dir=path.parent,
++            delete=False,
++        ) as output_file:
++            temp_path = Path(output_file.name)
++            json.dump(payload, output_file, indent=2, sort_keys=True)
++            output_file.write('\n')
++        temp_path.replace(path)
++        temp_path = None
++    finally:
++        if temp_path is not None:
++            temp_path.unlink(missing_ok=True)
++
++
++def _timing_distribution(values):
++    values = np.asarray(values, dtype=np.float64)
++    if len(values) == 0:
++        return {
++            'count': 0,
++            'mean_ms': None,
++            'std_ms': None,
++            'median_ms': None,
++            'p95_ms': None,
++            'total_ms': 0.0,
++        }
++    return {
++        'count': int(len(values)),
++        'mean_ms': float(values.mean()),
++        'std_ms': float(values.std(ddof=0)),
++        'median_ms': float(np.median(values)),
++        'p95_ms': float(np.quantile(values, 0.95)),
++        'total_ms': float(values.sum()),
++    }
++
++
++def _build_timing_summaries(step_records):
++    grouped = defaultdict(list)
++    for record in step_records:
++        grouped[int(record['episode_index'])].append(record)
++
++    rollout_rows = []
++    for episode_index, records in sorted(grouped.items()):
++        first = records[0]
++        row = {
++            'episode_index': episode_index,
++            'episode_seed': first.get('episode_seed'),
++            'rollout_success': first.get('rollout_success'),
++            'trajectory_reward': first.get('trajectory_reward'),
++            'policy_step_count': len(records),
++            'observation_count': int(sum(
++                int(record.get('observation_count', 0))
++                for record in records
++            )),
++        }
++        for stage in STAGE_FIELDS:
++            values = np.asarray(
++                [float(record[stage]) for record in records],
++                dtype=np.float64,
++            )
++            stage_name = stage.removesuffix('_ms')
++            row[f'{stage_name}_mean_ms'] = float(values.mean())
++            row[f'{stage_name}_total_ms'] = float(values.sum())
++        rollout_rows.append(row)
++
++    step_weighted = {
++        stage: _timing_distribution([
++            float(record[stage]) for record in step_records
++        ])
++        for stage in STAGE_FIELDS
++    }
++    rollout_weighted = {}
++    for stage in STAGE_FIELDS:
++        mean_field = f"{stage.removesuffix('_ms')}_mean_ms"
++        rollout_weighted[stage] = _timing_distribution([
++            float(row[mean_field]) for row in rollout_rows
++        ])
++    return rollout_rows, step_weighted, rollout_weighted
++
++
++def write_evaluation_timing(timing_dir, step_records, metadata):
++    """Persist per-step data plus step- and rollout-weighted summaries."""
++    timing_dir = Path(timing_dir)
++    step_path = timing_dir / 'step_timings.csv'
++    rollout_path = timing_dir / 'rollout_timing_summary.csv'
++    summary_path = timing_dir / 'evaluation_timing_summary.json'
++    rollout_rows, step_weighted, rollout_weighted = (
++        _build_timing_summaries(step_records)
++    )
++
++    _atomic_csv(step_path, step_records, (*STEP_ID_FIELDS, *STAGE_FIELDS))
++    rollout_headers = list(rollout_rows[0]) if rollout_rows else [
++        'episode_index',
++        'episode_seed',
++        'rollout_success',
++        'trajectory_reward',
++        'policy_step_count',
++        'observation_count',
++    ]
++    _atomic_csv(rollout_path, rollout_rows, rollout_headers)
++
++    payload = {
++        'schema_version': 1,
++        **metadata,
++        'completed_rollout_count': len(rollout_rows),
++        'policy_step_count': len(step_records),
++        'observation_count': int(sum(
++            int(record.get('observation_count', 0))
++            for record in step_records
++        )),
++        'stage_descriptions': STAGE_DESCRIPTIONS,
++        'step_weighted_statistics': step_weighted,
++        'rollout_weighted_statistics': rollout_weighted,
++        'evaluation_average_ms': {
++            stage.removesuffix('_ms'): rollout_weighted[stage]['mean_ms']
++            for stage in STAGE_FIELDS
++        },
++        'policy_step_definition': (
++            'One row is one policy decision. Observation-stage times are the '
++            'sum of all observations produced since the previous decision; '
++            'observation_count records how many were combined.'
++        ),
++        'aggregation_note': (
++            'Step-weighted statistics treat every policy step equally. '
++            'Rollout-weighted statistics first average steps within each '
++            'rollout, then average rollout means equally. '
++            'evaluation_average_ms is the rollout-weighted mean.'
++        ),
++        'files': {
++            'step_timings_csv': str(step_path),
++            'rollout_timing_summary_csv': str(rollout_path),
++            'evaluation_timing_summary_json': str(summary_path),
++        },
++    }
++    _atomic_json(summary_path, payload)
++    return payload
++
++class RLBenchRunner(BaseRunner):
++    def __init__(self,
++                 output_dir,
++                 eval_episodes=20,
++                 max_steps=1000,
++                 n_obs_steps=8,
++                 n_action_steps=8,
++                 fps=10,
++                 crf=22,
++                 render_size=84,
++                 tqdm_interval_sec=5.0,
++                 n_envs=None,
++                 task_name=None,
++                 n_train=None,
++                 n_test=None,
++                 device="cuda:0",
++                 use_point_crop=True,
++                 num_points=1024,
++                 depth_est_name=None,
++                 camera_names=['front', 'left_shoulder'],
++                 resolution=128,
++                 headless=False,
++                 debug=False,
++                 save_rollout_video=True,
++                 save_rollout_data=True,
++                 rollout_dir='rollouts',
++                 gt_noise_std_m=0.010,
++                 gt_noise_seed=0,
++                 d435_baseline_m=0.05,
++                 d435_disparity_noise_std_px=0.05,
++                 d435_disparity_bias_px=0.02,
++                 d435_disparity_quantization_px=1.0 / 32.0,
++                 d435_noise_seed=0,
++                 save_timing=False,
++                 timing_dir='timing',
++                 ):
++        super().__init__(output_dir)
++        self.task_name = task_name
++        self.camera_names = camera_names
++        self.resolution = resolution
++        self.save_rollout_video = save_rollout_video
++        self.save_rollout_data = save_rollout_data
++        self.rollout_dir = rollout_dir
++        self.save_timing = bool(save_timing)
++        self.timing_dir = str(timing_dir)
++        self.depth_est_name = str(depth_est_name)
++
++        normalized_depth_est_name = str(depth_est_name).casefold()
++        if normalized_depth_est_name == 'gt':
++            self.depth_estimator = None
++        elif normalized_depth_est_name.startswith(('gt_noisy', 'gt-noisy')):
++            from depth_estimators.gt_noisy import GTNoisyDepth
++            self.depth_estimator = GTNoisyDepth(
++                name=depth_est_name,
++                default_std_m=gt_noise_std_m,
++                seed=gt_noise_seed,
++            )
++        elif normalized_depth_est_name.startswith(('gt_d435', 'gt-d435')):
++            from depth_estimators.gt_d435 import GTD435Depth
++            self.depth_estimator = GTD435Depth(
++                name=depth_est_name,
++                baseline_m=d435_baseline_m,
++                disparity_noise_std_px=d435_disparity_noise_std_px,
++                disparity_bias_px=d435_disparity_bias_px,
++                disparity_quantization_px=d435_disparity_quantization_px,
++                seed=d435_noise_seed,
++            )
++        elif normalized_depth_est_name == 'vggt':
++            from depth_estimators.vggt_est import VGGT
++            self.depth_estimator = VGGT()
++        elif normalized_depth_est_name == 'map_anything':
++            from depth_estimators.map_anything_est import MapAnythingEst
++            self.depth_estimator = MapAnythingEst()
++        elif normalized_depth_est_name == 'mast3r':
++            from depth_estimators.mast3r_est import Mast3rEst
++            self.depth_estimator = Mast3rEst()
++        elif normalized_depth_est_name == 'moge':
++            from depth_estimators.moge_depth import MoGeDepth
++            self.depth_estimator = MoGeDepth()
++        elif normalized_depth_est_name == 'pi3':
++            from depth_estimators.pi3_est import Pi3Est
++            self.depth_estimator = Pi3Est()
++        else:
++            raise ValueError(f'Unknown depth estimator: {depth_est_name!r}')
++
++        self.eval_episodes = eval_episodes
++        def env_fn(task_name):
++            return MultiStepWrapper(
++                SimpleVideoRecordingWrapper(
++                    RLBenchEnv(
++                        task_name=task_name,
++                        num_points=num_points,
++                        depth_estimator=self.depth_estimator,
++                        camera_names=self.camera_names,
++                        resolution=self.resolution,
++                        headless=headless,
++                        debug=debug,
++                        record_point_cloud_reference=save_rollout_data,
++                        gt_noise_std_m=gt_noise_std_m,
++                        gt_noise_seed=gt_noise_seed,
++                    ),
++                    record_rollout_data=save_rollout_data,
++                ),
++                n_obs_steps=n_obs_steps,
++                n_action_steps=n_action_steps,
++                max_episode_steps=max_steps,
++                reward_agg_method='sum',
++            )
++                
++        self.env = env_fn(self.task_name)
++
++
++        self.fps = fps
++        self.crf = crf
++        self.n_obs_steps = n_obs_steps
++        self.n_action_steps = n_action_steps
++        self.max_steps = max_steps
++        self.tqdm_interval_sec = tqdm_interval_sec
++
++        self.logger_util_test = logger_util.LargestKRecorder(K=3)
++        self.logger_util_test10 = logger_util.LargestKRecorder(K=5)
++
++    def run(self, policy: BasePolicy, save_video=None, save_rollout_data=None):
++        device = policy.device
++
++        if save_video is None:
++            save_video = self.save_rollout_video
++        if save_rollout_data is None:
++            save_rollout_data = self.save_rollout_data
++        artifact_eval_dir = self._make_rollout_eval_dir() \
++            if save_video or save_rollout_data or self.save_timing else None
++
++        all_traj_rewards = []
++        all_success_rates = []
++        all_step_timings = []
++        evaluation_timing_summary = None
++        env = self.env
++        base_env = self._unwrap_env(env)
++        if self.eval_seed is not None:
++            cprint(
++                "RLBench evaluation episode seeds: "
++                f"{self.eval_seed}..{self.eval_seed + self.eval_episodes - 1}",
++                'cyan',
++            )
++
++        eval_progress = tqdm.tqdm(
++            total=self.eval_episodes,
++            desc=f"Eval in RLBench {self.task_name} Pointcloud Env",
++            leave=False,
++            mininterval=self.tqdm_interval_sec,
++        )
++        for episode_idx in range(self.eval_episodes):
++            episode_seed = None
++            if self.eval_seed is not None:
++                episode_seed = self.eval_seed + episode_idx
++
++            # start rollout
++            obs = env.reset(seed=episode_seed)
++            policy.reset()
++
++            done = False
++            traj_reward = 0
++            is_success = False
++            policy_step_idx = 0
++            episode_step_timings = []
++            while not done:
++                observation_timings = (
++                    base_env.pop_timing_records()
++                    if self.save_timing
++                    and hasattr(base_env, 'pop_timing_records')
++                    else []
++                )
++                observation_totals = {
++                    key: float(sum(record.get(key, 0.0)
++                                   for record in observation_timings))
++                    for key in (
++                        'rgb_preprocessing_s',
++                        'depth_estimation_s',
++                        'point_cloud_reconstruction_s',
++                        'point_cloud_preprocessing_s',
++                    )
++                }
++
++                policy_input_start = time.time()
++                np_obs_dict = dict(obs)
++                obs_dict = dict_apply(np_obs_dict,
++                                      lambda x: torch.from_numpy(x).to(
++                                          device=device))
++
++                with torch.no_grad():
++                    obs_dict_input = {}
++                    obs_dict_input['point_cloud'] = obs_dict['point_cloud'].unsqueeze(0)
++                    obs_dict_input['agent_pos'] = obs_dict['agent_pos'].unsqueeze(0)
++                policy_input_preprocessing_s = (
++                    time.time() - policy_input_start
++                )
++
++                policy_inference_start = time.time()
++                with torch.no_grad():
++                    action_dict = policy.predict_action(obs_dict_input)
++                policy_inference_s = time.time() - policy_inference_start
++
++                policy_output_start = time.time()
++                np_action_dict = dict_apply(action_dict,
++                                            lambda x: x.detach().to('cpu').numpy())
++                action = np_action_dict['action'].squeeze(0)
++                policy_output_postprocessing_s = (
++                    time.time() - policy_output_start
++                )
++
++                if self.save_timing:
++                    point_cloud_preprocessing_s = observation_totals[
++                        'point_cloud_preprocessing_s'
++                    ]
++                    data_preprocessing_s = (
++                        point_cloud_preprocessing_s
++                        + policy_input_preprocessing_s
++                    )
++                    total_pipeline_s = (
++                        observation_totals['rgb_preprocessing_s']
++                        + observation_totals['depth_estimation_s']
++                        + observation_totals['point_cloud_reconstruction_s']
++                        + data_preprocessing_s
++                        + policy_inference_s
++                        + policy_output_postprocessing_s
++                    )
++                    timing_record = {
++                        'episode_index': episode_idx,
++                        'episode_seed': episode_seed,
++                        'policy_step_index': policy_step_idx,
++                        'rollout_success': None,
++                        'trajectory_reward': None,
++                        'observation_count': len(observation_timings),
++                        'rgb_preprocessing_ms': 1000.0 * observation_totals[
++                            'rgb_preprocessing_s'
++                        ],
++                        'depth_estimation_ms': 1000.0 * observation_totals[
++                            'depth_estimation_s'
++                        ],
++                        'point_cloud_reconstruction_ms': 1000.0 * (
++                            observation_totals['point_cloud_reconstruction_s']
++                        ),
++                        'point_cloud_preprocessing_ms': 1000.0 * (
++                            point_cloud_preprocessing_s
++                        ),
++                        'policy_input_preprocessing_ms': 1000.0 * (
++                            policy_input_preprocessing_s
++                        ),
++                        'data_preprocessing_ms': 1000.0 * data_preprocessing_s,
++                        'policy_inference_ms': 1000.0 * policy_inference_s,
++                        'policy_output_postprocessing_ms': 1000.0 * (
++                            policy_output_postprocessing_s
++                        ),
++                        'total_pipeline_ms': 1000.0 * total_pipeline_s,
++                    }
++                    episode_step_timings.append(timing_record)
++                    all_step_timings.append(timing_record)
++
++                obs, reward, done, info = env.step(action)
++
++
++                traj_reward += reward
++                done = np.all(done)
++                is_success = is_success or max(info['success'])
++                policy_step_idx += 1
++
++            all_success_rates.append(is_success)
++            all_traj_rewards.append(traj_reward)
++            if self.save_timing:
++                for timing_record in episode_step_timings:
++                    timing_record['rollout_success'] = bool(is_success)
++                    timing_record['trajectory_reward'] = float(traj_reward)
++                timing_output_dir = os.path.join(
++                    artifact_eval_dir,
++                    self.timing_dir,
++                )
++                evaluation_timing_summary = write_evaluation_timing(
++                    timing_output_dir,
++                    all_step_timings,
++                    metadata={
++                        'task_name': self.task_name,
++                        'depth_estimator': self.depth_est_name,
++                        'configured_rollout_count': self.eval_episodes,
++                        'timing_clock': 'time.time',
++                        'cuda_synchronized': False,
++                        'n_obs_steps': self.n_obs_steps,
++                        'n_action_steps': self.n_action_steps,
++                    },
++                )
++            if save_video or save_rollout_data:
++                outcome = 'success' if is_success else 'failure'
++                artifact_name = f'rollout_{episode_idx:03d}_{outcome}'
++
++            if save_video:
++                try:
++                    video_path = os.path.join(
++                        artifact_eval_dir,
++                        'live_videos',
++                        f'{artifact_name}.mp4',
++                    )
++                    env.env.save_video(video_path, fps=self.fps)
++                except Exception as exc:
++                    cprint(
++                        f"Failed to save rollout {episode_idx} video: {exc}",
++                        'red',
++                    )
++            if save_rollout_data:
++                try:
++                    state_path = os.path.join(
++                        artifact_eval_dir,
++                        'live_states',
++                        f'{artifact_name}.npz',
++                    )
++                    env.env.save_rollout_data(
++                        state_path,
++                        fps=self.fps,
++                    )
++                except Exception as exc:
++                    cprint(
++                        f"Failed to save rollout {episode_idx} data: {exc}",
++                        'red',
++                    )
++            current_success_rate = float(np.mean(all_success_rates))
++            eval_progress.set_postfix(
++                success_rate=f"{current_success_rate:.1%}",
++                episode_seed=episode_seed,
++                refresh=False,
++            )
++            eval_progress.update(1)
++
++        eval_progress.close()
++            
++
++        log_data = dict()
++
++        log_data['mean_traj_rewards'] = np.mean(all_traj_rewards)
++        # log_data['mean_success_rates'] = np.mean(all_success_rates)
++
++        log_data['test_mean_score'] = np.mean(all_success_rates)
++        if self.eval_seed is not None:
++            log_data['eval_seed'] = self.eval_seed
++        
++        cprint(f"test_mean_score: {np.mean(all_success_rates)}", 'green')
++
++        self.logger_util_test.record(np.mean(all_success_rates))
++        self.logger_util_test10.record(np.mean(all_success_rates))
++        log_data['SR_test_L3'] = self.logger_util_test.average_of_largest_K()
++        log_data['SR_test_L5'] = self.logger_util_test10.average_of_largest_K()
++
++        if evaluation_timing_summary is not None:
++            for stage in STAGE_FIELDS:
++                stage_name = stage.removesuffix('_ms')
++                log_data[f'timing_step_mean_{stage_name}_ms'] = (
++                    evaluation_timing_summary['step_weighted_statistics'][
++                        stage
++                    ]['mean_ms']
++                )
++                log_data[f'timing_rollout_mean_{stage_name}_ms'] = (
++                    evaluation_timing_summary['rollout_weighted_statistics'][
++                        stage
++                    ]['mean_ms']
++                )
++            summary_path = evaluation_timing_summary['files'][
++                'evaluation_timing_summary_json'
++            ]
++            cprint(f"Saved evaluation timings to {summary_path}", 'cyan')
++        
++
++        _ = env.reset()
++
++        return log_data
++
++    @staticmethod
++    def _unwrap_env(env):
++        while not hasattr(env, 'pop_timing_records') and hasattr(env, 'env'):
++            env = env.env
++        return env
++
++    def _make_rollout_eval_dir(self):
++        """Create a new directory without overwriting earlier evaluations."""
++        root = os.path.join(self.output_dir, self.rollout_dir)
++        os.makedirs(root, exist_ok=True)
++        eval_idx = 0
++        while True:
++            eval_dir = os.path.join(root, f'eval_{eval_idx:04d}')
++            try:
++                os.mkdir(eval_dir)
++                os.mkdir(os.path.join(eval_dir, 'live_videos'))
++                os.mkdir(os.path.join(eval_dir, 'live_states'))
++                cprint(f"Saving rollout artifacts to {eval_dir}", 'cyan')
++                return eval_dir
++            except FileExistsError:
++                eval_idx += 1
+diff --git a/scripts/run.sh b/scripts/run.sh
+new file mode 100755
+index 0000000000000000000000000000000000000000..67ed1ed3ec7e9ed2621c20acf4ddba482ca5bf56
+--- /dev/null
++++ b/scripts/run.sh
+@@ -0,0 +1,12 @@
++#!/usr/bin/env bash
++
++set -euo pipefail
++
++estimator=${ESTIMATOR:-gt_noisy_20mm}
++run_tag=${RUN_TAG:-$(date +%m%d)}
++
++bash scripts/train_policy.sh dp3 rlb_close_microwave "${run_tag}" "${estimator}"
++
++bash scripts/train_policy.sh dp3 rlb_toilet_seat_down "${run_tag}" "${estimator}"
++
++bash scripts/train_policy.sh dp3 rlb_toilet_seat_up "${run_tag}" "${estimator}"
+\ No newline at end of file
+diff --git a/third_party/pytorch3d_simplified/LICENSE b/third_party/pytorch3d_simplified/LICENSE
+new file mode 100644
+index 0000000000000000000000000000000000000000..c55382ff0992d90ae5ecb2cd9ac624ccd20bda4d
+--- /dev/null
++++ b/third_party/pytorch3d_simplified/LICENSE
+@@ -0,0 +1,30 @@
++BSD License
++
++For PyTorch3D software
++
++Copyright (c) Meta Platforms, Inc. and affiliates. All rights reserved.
++
++Redistribution and use in source and binary forms, with or without modification,
++are permitted provided that the following conditions are met:
++
++ * Redistributions of source code must retain the above copyright notice, this
++   list of conditions and the following disclaimer.
++
++ * Redistributions in binary form must reproduce the above copyright notice,
++   this list of conditions and the following disclaimer in the documentation
++   and/or other materials provided with the distribution.
++
++ * Neither the name Meta nor the names of its contributors may be used to
++   endorse or promote products derived from this software without specific
++   prior written permission.
++
++THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
++ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
++WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
++ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
++(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
++LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
++ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
++SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.

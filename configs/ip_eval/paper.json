@@ -1,0 +1,9 @@
+{
+  "protocol": "paper",
+  "num_demos": 1,
+  "num_demo_iter": 20,
+  "num_rollouts": 10,
+  "demo_seed": 300000000,
+  "rollout_seed": 400000000,
+  "headless": true
+}

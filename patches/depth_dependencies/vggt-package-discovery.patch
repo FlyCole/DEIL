@@ -1,0 +1,24 @@
+diff --git a/pyproject.toml b/pyproject.toml
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -1,7 +1,7 @@
+ [project]
+ authors = [{name = "Jianyuan Wang", email = "jianyuan@robots.ox.ac.uk"}]
+ dependencies = [
+-    "numpy==1.26.1",
++    "numpy<2",
+     "Pillow",
+     "huggingface_hub",
+     "einops",
+@@ -33,8 +33,9 @@
+ build-backend = "setuptools.build_meta"
+ 
+ # setuptools configuration
+-[tool.setuptools]
+-packages = ["vggt"]
++[tool.setuptools.packages.find]
++where = ["."]
++include = ["vggt*"]
+ 
+ # Pixi configuration
+ [tool.pixi.workspace]

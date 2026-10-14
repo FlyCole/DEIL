@@ -1,0 +1,14 @@
+{
+  "protocol": "custom",
+  "task_name": "phone_on_base",
+  "estimators": ["gt", "pi3"],
+  "camera_setups": ["front_side"],
+  "resolution": 256,
+  "mask_input": false,
+  "num_demos": 1,
+  "num_demo_iter": 1,
+  "num_rollouts": 5,
+  "demo_seed": 500000000,
+  "rollout_seed": 600000000,
+  "headless": true
+}
