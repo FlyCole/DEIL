@@ -1,6 +1,6 @@
-# CPU analysis packages exercised in the existing Python 3.10 environment.
+# CPU analysis dependencies shared with the Python 3.10 simulation setup.
 # RLBench, CUDA, PyTorch, and depth-model dependencies are installed separately.
-numpy==2.2.6
+numpy==1.26.4
 scipy==1.15.3
 matplotlib==3.10.9
 pandas==2.3.3

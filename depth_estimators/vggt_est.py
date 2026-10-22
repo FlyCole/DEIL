@@ -14,8 +14,9 @@ from utils import Tmtx_from_posevec
 # Copyright (c) Meta Platforms, Inc. and affiliates.
 # All rights reserved.
 #
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
+# The adapted VGGT helpers below retain the upstream license at:
+# https://github.com/facebookresearch/vggt/blob/692096e8184112793170cd9b124bdc6ba30149cb/LICENSE.txt
+# The repository's MIT license applies to original DEIL code.
 
 
 def preprocess_images(images_pre: List[np.ndarray], mode="crop"):

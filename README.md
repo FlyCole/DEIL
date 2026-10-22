@@ -14,7 +14,7 @@ Run all commands from the repository root unless stated otherwise.
 
 ## Environment
 
-Use Linux, Python 3.10, an NVIDIA GPU, Git and a C/C++ compiler. This setup uses
+Use Linux x86-64, Python 3.10, an NVIDIA GPU, Git and a C/C++ compiler. This setup uses
 PyTorch 2.7 with CUDA 12.8, including support for RTX 50-series GPUs.
 
 ```bash
@@ -28,10 +28,9 @@ export PATH="$CUDA_HOME/bin:$PATH"
 python -m pip install torch==2.7.0 torchvision==0.22.0 torchaudio==2.7.0 \
   --index-url https://download.pytorch.org/whl/cu128
 python -m pip install -r requirements-analysis.txt
-python -m pip install numpy==1.26.4 \
-  diffusers==0.31.0 hydra-core==1.3.2 omegaconf==2.3.0 \
+python -m pip install diffusers==0.31.0 hydra-core==1.3.2 omegaconf==2.3.0 \
   einops==0.8.1 dill==0.3.5.1 moviepy==1.0.3 lightning==2.6.5 \
-  wandb imageio av termcolor open3d==0.19.0 gymnasium==1.1.0 \
+  wandb imageio av termcolor open3d==0.19.0 gym==0.26.2 gymnasium==1.1.0 \
   gdown timm safetensors pillow-heif plyfile ninja fvcore iopath \
   torch-geometric==2.7.0
 python -m pip install --no-deps --only-binary=:all: \
@@ -39,8 +38,10 @@ python -m pip install --no-deps --only-binary=:all: \
   -f https://data.pyg.org/whl/torch-2.7.0+cu128.html
 ```
 
-Keep NumPy at 1.26.4 for compatibility with Zarr 2.12. The NVIDIA driver must
-support CUDA 12.8. Historical environment YAML files are machine snapshots;
+`requirements-analysis.txt` pins NumPy to 1.26.4 for a consistent analysis and
+simulation environment. DP3's legacy wrappers require `gym` alongside
+`gymnasium`. The NVIDIA driver must support CUDA 12.8.
+Historical environment YAML files are machine snapshots;
 use the commands above for installation.
 
 ### Simulator and policy libraries
@@ -72,6 +73,10 @@ patches. SDK setup may update CoppeliaSim's `system/usrset.txt`. Version and
 patch records are in `runtime_dependencies.json`, `depth_dependencies.json`
 and `3D-Diffusion-Policy/release/source_manifest.json`.
 
+The retained RLBench patch retries scene-placement failures indefinitely, so a
+persistent placement failure can hang collection or evaluation. Its known
+limitations are recorded in `runtime_dependencies.json` under `known_legacy_issues`.
+
 ### Depth models and public Instant Policy weights
 
 Install only the depth models you need. For example:
@@ -100,6 +105,9 @@ Its default path is `instant_policy/checkpoints/model.pt`. Use
 `--checkpoint_path` to select another copy of the public weights. The public
 deployment binary is included; no separate Instant Policy package install is
 needed.
+
+`instant_policy/README.md` is preserved from upstream; use this root README for
+DEIL installation, since the bundled binary does not have package-install metadata.
 
 ## Instant Policy evaluation
 
@@ -178,18 +186,14 @@ arrays, set `PREPROCESS_RESUME=0` once to rebuild them.
 
 ## Result analysis
 
-Generate plots from the included DP3 statistics:
-
-```bash
-python -m data_analysis.dp3.plot_dp3_rollout_analysis \
-  --input_dir data_analysis/dp3/stats --output_dir results/dp3_figures
-```
-
-Process your own rollout artifacts:
+Process your own rollout artifacts to generate statistics and plots. Rollout
+artifacts and precomputed statistics are not bundled in the tracked repository.
 
 ```bash
 python -m data_analysis.dp3.process_dp3_rollout_artifacts \
   --input_dir /path/to/rollouts --stats_dir /path/to/stats --skip_videos
+python -m data_analysis.dp3.plot_dp3_rollout_analysis \
+  --input_dir /path/to/stats --output_dir /path/to/dp3_figures
 python -m data_analysis.ip.process_ip_rollout_artifacts \
   --input_dir /path/to/ip/execution_id --output_xlsx /path/to/ip.xlsx \
   --expected_rollouts 200 --skip_videos
@@ -198,8 +202,7 @@ python -m data_analysis.ip.plot_ip_rollout_analysis \
 ```
 
 For IP, use the specific execution directory printed by the evaluator and set
-`--expected_rollouts` to the actual count. `run_tc_eval.py` provides optional
-temporal-consistency experiments; use `--help` for its arguments.
+`--expected_rollouts` to the actual count.
 
 ## Citation
 
@@ -219,6 +222,19 @@ If you use this code in your research, please cite:
 }
 ```
 
+## License
+
+Original DEIL code is released under the [MIT License](LICENSE).
+Third-party code and weights retain their original licenses and notices;
+some are restricted to noncommercial research. 
+Public Instant Policy uses [PolyForm Noncommercial 1.0.0](instant_policy/LICENSE).
+DP3 uses the [MIT License](3D-Diffusion-Policy/LICENSE).
+The adapted VGGT helpers in `depth_estimators/vggt_est.py` retain
+[VGGT's upstream license](https://github.com/facebookresearch/vggt/blob/692096e8184112793170cd9b124bdc6ba30149cb/LICENSE.txt).
+MapAnything's source is Apache 2.0, while its selected weights use CC BY-NC 4.0.
+Dependency versions and license records are documented in `depth_dependencies.json`,
+`runtime_dependencies.json` and `3D-Diffusion-Policy/release/source_manifest.json`.
+
 ## Acknowledgements
 
 Built on [Instant Policy](https://github.com/vv19/instant_policy),
@@ -227,8 +243,3 @@ Built on [Instant Policy](https://github.com/vv19/instant_policy),
 [Pi3](https://github.com/yyfz/Pi3), [VGGT](https://github.com/facebookresearch/vggt),
 [MoGe](https://github.com/microsoft/MoGe), [MASt3R](https://github.com/naver/mast3r)
 and [MapAnything](https://github.com/facebookresearch/map-anything).
-
-Third-party code and weights retain their original licenses and notices;
-some are restricted to noncommercial research. Keep the bundled license files.
-Public Instant Policy uses PolyForm Noncommercial 1.0.0. MapAnything's source
-is Apache 2.0, while its selected weights use CC BY-NC 4.0.
