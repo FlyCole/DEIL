@@ -73,10 +73,6 @@ patches. SDK setup may update CoppeliaSim's `system/usrset.txt`. Version and
 patch records are in `runtime_dependencies.json`, `depth_dependencies.json`
 and `3D-Diffusion-Policy/release/source_manifest.json`.
 
-The retained RLBench patch retries scene-placement failures indefinitely, so a
-persistent placement failure can hang collection or evaluation. Its known
-limitations are recorded in `runtime_dependencies.json` under `known_legacy_issues`.
-
 ### Depth models and public Instant Policy weights
 
 Install only the depth models you need. For example:

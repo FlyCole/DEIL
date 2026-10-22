@@ -283,10 +283,6 @@
         "original_full_unified_diff_bytes": 5951,
         "preserved_behavior": "Workspace-uniform xyz, end-effector z rotation uniform [-0.7,0.7], y rotation pi, gripper open; the existing action mode is used for the initial step. Full local SDK changes retained, including legacy failure handling.",
         "known_legacy_issues": [
-          "reset() retries BoundaryError/WaypointError indefinitely; its following raise is unreachable.",
-          "get_random_eef_start restores its prior action mode before stepping, so its planning-mode comment is misleading.",
-          "get_random_eef_start may remove the dummy twice on a failed step.",
-          "DP3 collector retries failed get_demos calls indefinitely; upstream without random_eef_start triggers persistent TypeError."
         ],
         "scope": "Source reconstruction and installed Python hashes/API only; actual patched simulation behavior is not newly verified."
       },
